@@ -1974,9 +1974,6 @@ export default function AdminPage() {
                         <div>
                           <div className="flex items-center gap-2">
                             <span className="font-black text-slate-900 text-base">{c.name}</span>
-                            <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${theme.badgeBg} ${theme.badgeText}`}>
-                              {meta.badge}
-                            </span>
                           </div>
                           {meta.description && (
                             <p className="text-xs text-slate-600 font-medium line-clamp-1">{meta.description}</p>

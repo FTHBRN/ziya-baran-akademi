@@ -57,8 +57,7 @@ export default function HomePage() {
       const meta = decodeModuleMetadata(m.description, m.order_index || 0, m.name);
       return (
         m.name.toLowerCase().includes(q) ||
-        meta.description.toLowerCase().includes(q) ||
-        meta.badge.toLowerCase().includes(q)
+        meta.description.toLowerCase().includes(q)
       );
     });
   }, [modules, searchQuery]);
@@ -251,27 +250,20 @@ export default function HomePage() {
                     href={`/module/${m.slug}`}
                     className={`group relative rounded-3xl border ${theme.border} ${theme.cardBg} p-5 sm:p-6 shadow-xs hover:shadow-md transition-all duration-300 hover:scale-[1.01] flex flex-col justify-between overflow-hidden`}
                   >
-                    {/* Top Row: Badge & Sub-tagline */}
+                    {/* Top Area: Tagline & Main Title & Description */}
                     <div className="space-y-2.5">
-                      <div className="flex items-center justify-between">
-                        <span
-                          className={`text-xs font-black px-3 py-0.5 rounded-full ${theme.badgeBg} ${theme.badgeText} shadow-2xs tracking-wide`}
-                        >
-                          {meta.badge}
-                        </span>
-
-                        {/* Top-right micro sticker text from screenshot */}
-                        {meta.tagline && (
-                          <span className="text-[11px] font-bold text-slate-400 italic hidden sm:inline">
+                      {meta.tagline && (
+                        <div className="flex items-center justify-end">
+                          <span className="text-[11px] font-bold text-slate-400 italic">
                             {meta.tagline}
                           </span>
-                        )}
-                      </div>
+                        </div>
+                      )}
 
                       {/* Main Title & Description */}
                       <div className="space-y-1">
-                        <h2 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2">
-                          <span className="text-2xl shrink-0 group-hover:scale-110 transition-transform">
+                        <h2 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2.5">
+                          <span className="text-2xl sm:text-3xl shrink-0 group-hover:scale-110 transition-transform">
                             {meta.icon}
                           </span>
                           <span>{m.name}</span>
