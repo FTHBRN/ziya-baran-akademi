@@ -451,7 +451,7 @@ export default function SetStudyPage() {
   const { description: cleanDesc, coverImageUrl, studyNotes, storyMeta } = decodeSetDescription(setInfo.description);
 
   return (
-    <div className={`mx-auto space-y-3 sm:space-y-5 ${storyMeta?.isStory ? 'max-w-5xl' : 'max-w-3xl'}`}>
+    <div className={`mx-auto space-y-3 sm:space-y-5 ${mode === 'story' ? 'max-w-6xl' : 'max-w-3xl'}`}>
       {/* Compact Study Navigation Bar */}
       <div className="flex items-center justify-between gap-2 px-1 py-1 sm:pb-2 border-b border-slate-200/80">
         {/* Left: Geri (Back) + Ana Sayfa (Home) */}
@@ -580,11 +580,11 @@ export default function SetStudyPage() {
       {mode === 'story' && (
         <div className="space-y-4 animate-in fade-in duration-200">
           {/* Main Content: Desktop 2-column, Mobile 1-column */}
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
             {/* Left Column: Scene Illustration & Motivational Quote */}
-            <div className="lg:col-span-4 space-y-3">
+            <div className="lg:col-span-4 xl:col-span-3 space-y-3 lg:sticky lg:top-4">
               {coverImageUrl ? (
-                <div className="rounded-3xl overflow-hidden shadow-md border-2 border-slate-200/80 bg-slate-50 aspect-4/3 lg:aspect-square relative group">
+                <div className="rounded-3xl overflow-hidden shadow-sm border border-slate-200/80 bg-slate-50 aspect-4/3 relative group">
                   <img
                     src={coverImageUrl}
                     alt={setInfo.title}
@@ -592,7 +592,7 @@ export default function SetStudyPage() {
                   />
                 </div>
               ) : (
-                <div className="hidden lg:flex rounded-3xl p-8 border-2 border-dashed border-slate-200 bg-slate-50 text-center flex-col items-center justify-center space-y-2 aspect-4/3 lg:aspect-square">
+                <div className="hidden lg:flex rounded-3xl p-8 border-2 border-dashed border-slate-200 bg-slate-50 text-center flex-col items-center justify-center space-y-2 aspect-4/3">
                   <BookOpen className="w-12 h-12 text-slate-300" />
                   <span className="text-xs font-semibold text-slate-400">Görsel Eklenmemiş</span>
                 </div>
@@ -609,15 +609,15 @@ export default function SetStudyPage() {
             </div>
 
             {/* Right Column: Sentence List / Table */}
-            <div className="lg:col-span-8 bg-white rounded-3xl border border-slate-200/80 shadow-sm p-3 sm:p-5 space-y-2">
+            <div className="lg:col-span-8 xl:col-span-9 bg-white rounded-3xl border border-slate-200/80 shadow-sm p-3.5 sm:p-6 space-y-2">
               {/* Desktop Table Header */}
-              <div className="hidden sm:grid grid-cols-12 gap-2 px-3 py-2 text-[11px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100">
-                <div className="col-span-1 text-center">#</div>
-                <div className="col-span-5 flex items-center gap-1.5">
+              <div className="hidden sm:grid grid-cols-[36px_minmax(0,1.35fr)_minmax(0,1fr)_minmax(210px,auto)] gap-4 px-3.5 py-2 text-[11px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100">
+                <div className="text-center">#</div>
+                <div className="flex items-center gap-1.5">
                   <span>🇬🇧 İngilizce</span>
                 </div>
-                <div className="col-span-3">🇹🇷 Türkçe</div>
-                <div className="col-span-3">🎧 Okunuş</div>
+                <div>🇹🇷 Türkçe</div>
+                <div>🎧 Okunuş</div>
               </div>
 
               {/* Sentences Rows */}
@@ -629,14 +629,14 @@ export default function SetStudyPage() {
                   return (
                     <div
                       key={card.id || idx}
-                      className={`py-2.5 px-2 sm:px-3 rounded-2xl transition-colors ${
-                        isPlaying ? 'bg-brand-50/60 ring-1 ring-brand-200' : 'hover:bg-slate-50/70'
+                      className={`py-2.5 sm:py-3 px-2 sm:px-3.5 rounded-2xl transition-all ${
+                        isPlaying ? 'bg-brand-50/70 ring-1 ring-brand-200 shadow-2xs' : 'hover:bg-slate-50/70'
                       }`}
                     >
-                      {/* Desktop Grid Layout */}
-                      <div className="hidden sm:grid grid-cols-12 gap-2 items-center">
+                      {/* Desktop Grid Layout (Spacious, Single-line Pronunciation) */}
+                      <div className="hidden sm:grid grid-cols-[36px_minmax(0,1.35fr)_minmax(0,1fr)_minmax(210px,auto)] gap-4 items-center">
                         {/* Number Badge */}
-                        <div className="col-span-1 flex justify-center">
+                        <div className="flex justify-center">
                           <span
                             className={`w-6 h-6 rounded-full text-xs font-black flex items-center justify-center shadow-2xs ${badgeColor}`}
                           >
@@ -645,7 +645,7 @@ export default function SetStudyPage() {
                         </div>
 
                         {/* English with Play Button */}
-                        <div className="col-span-5 flex items-center gap-2 min-w-0">
+                        <div className="flex items-center gap-3 min-w-0">
                           <button
                             type="button"
                             onClick={() => speakSentence(card.english_text, idx)}
@@ -654,27 +654,27 @@ export default function SetStudyPage() {
                           >
                             <Play className="w-3.5 h-3.5 fill-current ml-0.5" />
                           </button>
-                          <span className="text-sm font-bold text-slate-900 leading-snug break-words">
+                          <span className="text-sm font-bold text-slate-900 leading-snug">
                             {card.english_text}
                           </span>
                         </div>
 
                         {/* Turkish */}
-                        <div className="col-span-3 text-xs sm:text-sm font-medium text-slate-700 leading-snug break-words">
+                        <div className="text-sm font-medium text-slate-700 leading-snug">
                           {card.turkish_text}
                         </div>
 
-                        {/* Pronunciation */}
-                        <div className="col-span-3">
+                        {/* Pronunciation: strictly single line, never wrapping */}
+                        <div className="flex items-center">
                           {card.pronunciation ? (
                             <button
                               type="button"
                               onClick={() => speakSentence(card.english_text, idx)}
-                              className="text-left text-xs font-semibold text-indigo-700 bg-indigo-50/90 hover:bg-indigo-100 border border-indigo-100/90 px-2.5 py-1 rounded-lg transition-colors inline-flex items-center gap-1.5 break-words group"
+                              className="text-xs font-semibold text-indigo-700 bg-indigo-50/90 hover:bg-indigo-100 border border-indigo-100/90 px-3 py-1.5 rounded-xl transition-colors inline-flex items-center gap-2 whitespace-nowrap group shadow-2xs"
                               title="Tıkla ve dinle"
                             >
-                              <Volume2 className="w-3 h-3 text-indigo-500 shrink-0 group-hover:scale-110 transition-transform" />
-                              <span>{card.pronunciation}</span>
+                              <Volume2 className="w-3.5 h-3.5 text-indigo-500 shrink-0 group-hover:scale-110 transition-transform" />
+                              <span className="whitespace-nowrap">{card.pronunciation}</span>
                             </button>
                           ) : (
                             <span className="text-xs text-slate-300">-</span>
@@ -714,10 +714,10 @@ export default function SetStudyPage() {
                               <button
                                 type="button"
                                 onClick={() => speakSentence(card.english_text, idx)}
-                                className="mt-1.5 text-left text-[11px] font-semibold text-indigo-700 bg-indigo-50/90 border border-indigo-100/80 px-2 py-0.5 rounded-md inline-flex items-center gap-1"
+                                className="mt-1.5 text-left text-[11px] font-semibold text-indigo-700 bg-indigo-50/90 border border-indigo-100/80 px-2.5 py-1 rounded-md inline-flex items-center gap-1.5 whitespace-nowrap"
                               >
                                 <Volume2 className="w-3 h-3 text-indigo-500 shrink-0" />
-                                <span>{card.pronunciation}</span>
+                                <span className="whitespace-nowrap">{card.pronunciation}</span>
                               </button>
                             )}
                           </div>
@@ -726,39 +726,6 @@ export default function SetStudyPage() {
                     </div>
                   );
                 })}
-              </div>
-            </div>
-          </div>
-
-          {/* Bottom Guidance Cards (Listen, Read, Repeat) */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-2">
-            <div className="flex items-center gap-3 p-3 rounded-2xl bg-blue-50/80 border border-blue-100 text-blue-900">
-              <div className="w-8 h-8 rounded-xl bg-blue-500 text-white flex items-center justify-center shrink-0 shadow-2xs">
-                <Volume2 className="w-4 h-4" />
-              </div>
-              <div>
-                <div className="text-xs font-bold">Dinle (Listen)</div>
-                <div className="text-[11px] text-blue-700/80 font-normal">Mavi butona basarak cümleyi dinleyin.</div>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-3 p-3 rounded-2xl bg-rose-50/80 border border-rose-100 text-rose-900">
-              <div className="w-8 h-8 rounded-xl bg-rose-500 text-white flex items-center justify-center shrink-0 shadow-2xs">
-                <BookOpen className="w-4 h-4" />
-              </div>
-              <div>
-                <div className="text-xs font-bold">Oku (Read)</div>
-                <div className="text-[11px] text-rose-700/80 font-normal">İngilizce ve Türkçesini takip edin.</div>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-3 p-3 rounded-2xl bg-emerald-50/80 border border-emerald-100 text-emerald-900">
-              <div className="w-8 h-8 rounded-xl bg-emerald-500 text-white flex items-center justify-center shrink-0 shadow-2xs">
-                <Sparkles className="w-4 h-4" />
-              </div>
-              <div>
-                <div className="text-xs font-bold">Tekrar Et (Repeat)</div>
-                <div className="text-[11px] text-emerald-700/80 font-normal">Okunuş rehberiyle sesli tekrar edin!</div>
               </div>
             </div>
           </div>
