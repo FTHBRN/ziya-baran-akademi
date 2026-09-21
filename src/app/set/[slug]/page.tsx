@@ -451,7 +451,7 @@ export default function SetStudyPage() {
   const { description: cleanDesc, coverImageUrl, studyNotes, storyMeta } = decodeSetDescription(setInfo.description);
 
   return (
-    <div className={`mx-auto space-y-3 sm:space-y-5 ${mode === 'story' ? 'max-w-6xl' : 'max-w-3xl'}`}>
+    <div className={`mx-auto space-y-3 sm:space-y-5 ${mode === 'story' ? 'max-w-7xl' : 'max-w-3xl'}`}>
       {/* Compact Study Navigation Bar */}
       <div className="flex items-center justify-between gap-2 px-1 py-1 sm:pb-2 border-b border-slate-200/80">
         {/* Left: Geri (Back) + Ana Sayfa (Home) */}
@@ -580,9 +580,9 @@ export default function SetStudyPage() {
       {mode === 'story' && (
         <div className="space-y-4 animate-in fade-in duration-200">
           {/* Main Content: Desktop 2-column, Mobile 1-column */}
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-            {/* Left Column: Scene Illustration & Motivational Quote */}
-            <div className="lg:col-span-4 xl:col-span-3 space-y-3 lg:sticky lg:top-4">
+          <div className="flex flex-col lg:flex-row gap-6 items-start">
+            {/* Left Column: Scene Illustration & Motivational Quote (Compact fixed sidebar) */}
+            <div className="w-full lg:w-64 xl:w-72 shrink-0 space-y-3 lg:sticky lg:top-4">
               {coverImageUrl ? (
                 <div className="rounded-3xl overflow-hidden shadow-sm border border-slate-200/80 bg-slate-50 aspect-4/3 relative group">
                   <img
@@ -608,10 +608,10 @@ export default function SetStudyPage() {
               )}
             </div>
 
-            {/* Right Column: Sentence List / Table */}
-            <div className="lg:col-span-8 xl:col-span-9 bg-white rounded-3xl border border-slate-200/80 shadow-sm p-3.5 sm:p-6 space-y-2">
+            {/* Right Column: Sentence List / Table (Expands to fill remaining space) */}
+            <div className="flex-1 min-w-0 w-full bg-white rounded-3xl border border-slate-200/80 shadow-sm p-3.5 sm:p-6 space-y-2">
               {/* Desktop Table Header */}
-              <div className="hidden sm:grid grid-cols-[36px_minmax(0,1.35fr)_minmax(0,1fr)_minmax(210px,auto)] gap-4 px-3.5 py-2 text-[11px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100">
+              <div className="hidden sm:grid grid-cols-[36px_minmax(0,1.8fr)_minmax(0,1.3fr)_minmax(210px,auto)] gap-4 px-3.5 py-2 text-[11px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100">
                 <div className="text-center">#</div>
                 <div className="flex items-center gap-1.5">
                   <span>🇬🇧 İngilizce</span>
@@ -634,7 +634,7 @@ export default function SetStudyPage() {
                       }`}
                     >
                       {/* Desktop Grid Layout (Spacious, Single-line Pronunciation) */}
-                      <div className="hidden sm:grid grid-cols-[36px_minmax(0,1.35fr)_minmax(0,1fr)_minmax(210px,auto)] gap-4 items-center">
+                      <div className="hidden sm:grid grid-cols-[36px_minmax(0,1.8fr)_minmax(0,1.3fr)_minmax(210px,auto)] gap-4 items-center">
                         {/* Number Badge */}
                         <div className="flex justify-center">
                           <span
