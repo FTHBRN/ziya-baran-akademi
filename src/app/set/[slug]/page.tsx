@@ -592,7 +592,7 @@ export default function SetStudyPage() {
                   />
                 </div>
               ) : (
-                <div className="rounded-3xl p-8 border-2 border-dashed border-slate-200 bg-slate-50 text-center flex flex-col items-center justify-center space-y-2 aspect-4/3 lg:aspect-square">
+                <div className="hidden lg:flex rounded-3xl p-8 border-2 border-dashed border-slate-200 bg-slate-50 text-center flex-col items-center justify-center space-y-2 aspect-4/3 lg:aspect-square">
                   <BookOpen className="w-12 h-12 text-slate-300" />
                   <span className="text-xs font-semibold text-slate-400">Görsel Eklenmemiş</span>
                 </div>
