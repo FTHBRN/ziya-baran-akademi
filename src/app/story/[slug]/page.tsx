@@ -26,6 +26,7 @@ import {
   Play,
   Pause,
   ExternalLink,
+  Home,
 } from 'lucide-react';
 
 interface StoryPageData {
@@ -309,31 +310,40 @@ export default function StoryReaderPage() {
   };
 
   return (
-    <div className="max-w-3xl mx-auto space-y-6 pb-20 select-none">
-      {/* Top Header & Breadcrumb */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-200/80">
-        <div className="flex items-center gap-3">
-          <Link
-            href="/"
-            className="p-2 rounded-xl border border-slate-200 hover:bg-slate-100 text-slate-600 transition"
-            title="Derslere Dön"
+    <div className="max-w-3xl mx-auto space-y-3 sm:space-y-5 pb-8 select-none">
+      {/* Compact Study Navigation Bar */}
+      <div className="flex items-center justify-between gap-2 px-1 py-1 sm:pb-2 border-b border-slate-200/80">
+        {/* Left: Geri (Back) + Ana Sayfa (Home) */}
+        <div className="flex items-center gap-1.5 shrink-0">
+          <button
+            type="button"
+            onClick={() => router.back()}
+            className="p-2 sm:px-3 sm:py-1.5 rounded-xl bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 font-bold text-xs shadow-2xs flex items-center gap-1.5 transition-all active:scale-95"
+            title="Geri Dön"
           >
             <ArrowLeft className="w-4 h-4" />
+            <span className="hidden sm:inline">Geri</span>
+          </button>
+
+          <Link
+            href="/"
+            className="p-2 sm:px-3 sm:py-1.5 rounded-xl bg-white hover:bg-slate-100 border border-slate-200 text-slate-600 hover:text-slate-900 text-xs font-semibold shadow-2xs flex items-center gap-1.5 transition-all active:scale-95"
+            title="Ana Sayfa"
+          >
+            <Home className="w-4 h-4" />
+            <span className="hidden sm:inline">Ana Sayfa</span>
           </Link>
-          <div>
-            <div className="flex items-center gap-2 text-xs font-medium text-slate-500">
-              <span>{story.folders?.classes?.name || 'Ziya Baran Akademi'}</span>
-              <span>•</span>
-              <span>{story.folders?.name || 'Hikâyeler'}</span>
-            </div>
-            <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight flex items-center gap-2 mt-0.5">
-              <span>{story.title}</span>
-            </h1>
-          </div>
+        </div>
+
+        {/* Center: Story Name */}
+        <div className="text-center min-w-0 flex-1 px-2">
+          <h1 className="text-sm sm:text-base font-black text-slate-900 truncate tracking-tight">
+            {story.title}
+          </h1>
         </div>
 
         {/* Reader Customization Controls */}
-        <div className="flex items-center gap-1.5 self-end sm:self-auto bg-white border border-slate-200 p-1.5 rounded-2xl shadow-sm">
+        <div className="flex items-center gap-1 shrink-0 bg-white border border-slate-200 p-1 rounded-xl shadow-2xs">
           {/* Theme toggles */}
           <button
             onClick={() => setTheme('paper')}

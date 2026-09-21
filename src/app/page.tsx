@@ -250,16 +250,6 @@ export default function HomePage() {
                     href={`/module/${m.slug}`}
                     className={`group relative rounded-3xl border ${theme.border} ${theme.cardBg} p-5 sm:p-6 shadow-xs hover:shadow-md transition-all duration-300 hover:scale-[1.01] flex flex-col justify-between overflow-hidden`}
                   >
-                    {/* Top Area: Tagline & Main Title & Description */}
-                    <div className="space-y-2.5">
-                      {meta.tagline && (
-                        <div className="flex items-center justify-end">
-                          <span className="text-[11px] font-bold text-slate-400 italic">
-                            {meta.tagline}
-                          </span>
-                        </div>
-                      )}
-
                       {/* Main Title & Description */}
                       <div className="space-y-1">
                         <h2 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2.5">
@@ -272,7 +262,6 @@ export default function HomePage() {
                           {meta.description}
                         </p>
                       </div>
-                    </div>
 
                     {/* Bottom Row: Pill "Başla ->" Button & Floating 3D Graphic */}
                     <div className="pt-6 flex items-center justify-between">
