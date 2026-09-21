@@ -17,9 +17,25 @@ import {
   Repeat,
   BookOpen,
   Home,
+  Play,
+  Headphones,
+  Sparkles,
 } from 'lucide-react';
 import { decodeSetDescription } from '@/lib/set-utils';
 import { decodeCardTurkish } from '@/lib/card-utils';
+
+const BADGE_COLORS = [
+  'bg-rose-500 text-white',
+  'bg-blue-500 text-white',
+  'bg-emerald-500 text-white',
+  'bg-amber-500 text-white',
+  'bg-purple-500 text-white',
+  'bg-cyan-500 text-white',
+  'bg-pink-500 text-white',
+  'bg-indigo-500 text-white',
+  'bg-teal-500 text-white',
+  'bg-orange-500 text-white',
+];
 
 export default function SetStudyPage() {
   const router = useRouter();
@@ -30,8 +46,9 @@ export default function SetStudyPage() {
   const [cards, setCards] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Active study mode: 'flashcards' | 'quiz' | 'writing'
-  const [mode, setMode] = useState<'flashcards' | 'quiz' | 'writing'>('flashcards');
+  // Active study mode: 'story' | 'flashcards' | 'quiz' | 'writing'
+  const [mode, setMode] = useState<'story' | 'flashcards' | 'quiz' | 'writing'>('flashcards');
+  const [playingSentenceIdx, setPlayingSentenceIdx] = useState<number | null>(null);
 
   // Study Notes Modal
   const [showNotesModal, setShowNotesModal] = useState(false);
@@ -69,6 +86,10 @@ export default function SetStudyPage() {
 
         if (setItem) {
           setSetInfo(setItem);
+          const decodedDesc = decodeSetDescription(setItem.description);
+          if (decodedDesc.storyMeta?.isStory) {
+            setMode('story');
+          }
           const sortedCards = (setItem.set_cards || [])
             .sort((a: any, b: any) => (a.order_index || 0) - (b.order_index || 0))
             .map((c: any) => {
@@ -127,6 +148,14 @@ export default function SetStudyPage() {
     } catch (e) {
       fallbackSpeak(cleanText);
     }
+  };
+
+  const speakSentence = (text: string, idx?: number) => {
+    if (idx !== undefined) setPlayingSentenceIdx(idx);
+    speak(text);
+    setTimeout(() => {
+      setPlayingSentenceIdx(null);
+    }, 3000);
   };
 
   // Animation state for card sliding (Quizlet-style slide & swipe)
@@ -419,10 +448,10 @@ export default function SetStudyPage() {
   }
 
   const currentCard = cards[cardIndex];
-  const { description: cleanDesc, studyNotes } = decodeSetDescription(setInfo.description);
+  const { description: cleanDesc, coverImageUrl, studyNotes, storyMeta } = decodeSetDescription(setInfo.description);
 
   return (
-    <div className="max-w-3xl mx-auto space-y-3 sm:space-y-5">
+    <div className={`mx-auto space-y-3 sm:space-y-5 ${storyMeta?.isStory ? 'max-w-5xl' : 'max-w-3xl'}`}>
       {/* Compact Study Navigation Bar */}
       <div className="flex items-center justify-between gap-2 px-1 py-1 sm:pb-2 border-b border-slate-200/80">
         {/* Left: Geri (Back) + Ana Sayfa (Home) */}
@@ -452,12 +481,17 @@ export default function SetStudyPage() {
           <h1 className="text-sm sm:text-base font-black text-slate-900 truncate tracking-tight">
             {setInfo.title}
           </h1>
+          {storyMeta?.subtitle && (
+            <p className="text-xs text-brand-600 font-bold truncate">
+              {storyMeta.subtitle}
+            </p>
+          )}
         </div>
 
         {/* Right: Card Counter */}
         <div className="flex items-center shrink-0">
           <span className="text-xs font-bold text-slate-700 bg-white border border-slate-200 px-2.5 py-1.5 rounded-xl shadow-2xs">
-            {cardIndex + 1} / {cards.length}
+            {storyMeta?.isStory ? `${cards.length} Cümle` : `${cardIndex + 1} / ${cards.length}`}
           </span>
         </div>
       </div>
@@ -484,8 +518,20 @@ export default function SetStudyPage() {
         </div>
       )}
 
-      {/* Mode Switcher Tabs (Shortened) */}
-      <div className="grid grid-cols-3 gap-1 bg-slate-200/70 p-1 rounded-2xl">
+      {/* Mode Switcher Tabs */}
+      <div className={`grid ${storyMeta?.isStory ? 'grid-cols-4' : 'grid-cols-3'} gap-1 bg-slate-200/70 p-1 rounded-2xl`}>
+        {storyMeta?.isStory && (
+          <button
+            onClick={() => setMode('story')}
+            className={`py-2.5 text-xs sm:text-sm font-semibold rounded-xl transition-all ${
+              mode === 'story'
+                ? 'bg-white text-brand-700 shadow-sm'
+                : 'text-slate-600 hover:text-slate-900 font-medium'
+            }`}
+          >
+            📖 Hikaye
+          </button>
+        )}
         <button
           onClick={() => {
             setMode('flashcards');
@@ -527,6 +573,197 @@ export default function SetStudyPage() {
           Yaz
         </button>
       </div>
+
+      {/* ========================================================= */}
+      {/* MODE 0: STORY VIEW (10-Sentence Visual Table Layout)       */}
+      {/* ========================================================= */}
+      {mode === 'story' && (
+        <div className="space-y-4 animate-in fade-in duration-200">
+          {/* Main Content: Desktop 2-column, Mobile 1-column */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
+            {/* Left Column: Scene Illustration & Motivational Quote */}
+            <div className="lg:col-span-4 space-y-3">
+              {coverImageUrl ? (
+                <div className="rounded-3xl overflow-hidden shadow-md border-2 border-slate-200/80 bg-slate-50 aspect-4/3 lg:aspect-square relative group">
+                  <img
+                    src={coverImageUrl}
+                    alt={setInfo.title}
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                  />
+                </div>
+              ) : (
+                <div className="rounded-3xl p-8 border-2 border-dashed border-slate-200 bg-slate-50 text-center flex flex-col items-center justify-center space-y-2 aspect-4/3 lg:aspect-square">
+                  <BookOpen className="w-12 h-12 text-slate-300" />
+                  <span className="text-xs font-semibold text-slate-400">Görsel Eklenmemiş</span>
+                </div>
+              )}
+
+              {storyMeta?.quote && (
+                <div className="bg-amber-50/90 border border-amber-200/80 rounded-2xl p-3.5 flex items-center gap-3 shadow-2xs">
+                  <span className="text-2xl select-none">⭐</span>
+                  <p className="text-xs sm:text-sm font-bold text-amber-950 italic leading-snug">
+                    "{storyMeta.quote}"
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Right Column: Sentence List / Table */}
+            <div className="lg:col-span-8 bg-white rounded-3xl border border-slate-200/80 shadow-sm p-3 sm:p-5 space-y-2">
+              {/* Desktop Table Header */}
+              <div className="hidden sm:grid grid-cols-12 gap-2 px-3 py-2 text-[11px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100">
+                <div className="col-span-1 text-center">#</div>
+                <div className="col-span-5 flex items-center gap-1.5">
+                  <span>🇬🇧 İngilizce</span>
+                </div>
+                <div className="col-span-3">🇹🇷 Türkçe</div>
+                <div className="col-span-3">🎧 Okunuş</div>
+              </div>
+
+              {/* Sentences Rows */}
+              <div className="divide-y divide-slate-100">
+                {cards.map((card, idx) => {
+                  const badgeColor = BADGE_COLORS[idx % BADGE_COLORS.length];
+                  const isPlaying = playingSentenceIdx === idx;
+
+                  return (
+                    <div
+                      key={card.id || idx}
+                      className={`py-2.5 px-2 sm:px-3 rounded-2xl transition-colors ${
+                        isPlaying ? 'bg-brand-50/60 ring-1 ring-brand-200' : 'hover:bg-slate-50/70'
+                      }`}
+                    >
+                      {/* Desktop Grid Layout */}
+                      <div className="hidden sm:grid grid-cols-12 gap-2 items-center">
+                        {/* Number Badge */}
+                        <div className="col-span-1 flex justify-center">
+                          <span
+                            className={`w-6 h-6 rounded-full text-xs font-black flex items-center justify-center shadow-2xs ${badgeColor}`}
+                          >
+                            {idx + 1}
+                          </span>
+                        </div>
+
+                        {/* English with Play Button */}
+                        <div className="col-span-5 flex items-center gap-2 min-w-0">
+                          <button
+                            type="button"
+                            onClick={() => speakSentence(card.english_text, idx)}
+                            className="w-7 h-7 rounded-full bg-blue-500 hover:bg-blue-600 active:scale-95 text-white flex items-center justify-center shrink-0 shadow-xs transition-transform"
+                            title="Sesli Dinle"
+                          >
+                            <Play className="w-3.5 h-3.5 fill-current ml-0.5" />
+                          </button>
+                          <span className="text-sm font-bold text-slate-900 leading-snug break-words">
+                            {card.english_text}
+                          </span>
+                        </div>
+
+                        {/* Turkish */}
+                        <div className="col-span-3 text-xs sm:text-sm font-medium text-slate-700 leading-snug break-words">
+                          {card.turkish_text}
+                        </div>
+
+                        {/* Pronunciation */}
+                        <div className="col-span-3">
+                          {card.pronunciation ? (
+                            <button
+                              type="button"
+                              onClick={() => speakSentence(card.english_text, idx)}
+                              className="text-left text-xs font-semibold text-indigo-700 bg-indigo-50/90 hover:bg-indigo-100 border border-indigo-100/90 px-2.5 py-1 rounded-lg transition-colors inline-flex items-center gap-1.5 break-words group"
+                              title="Tıkla ve dinle"
+                            >
+                              <Volume2 className="w-3 h-3 text-indigo-500 shrink-0 group-hover:scale-110 transition-transform" />
+                              <span>{card.pronunciation}</span>
+                            </button>
+                          ) : (
+                            <span className="text-xs text-slate-300">-</span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Mobile Card / Touch-Friendly Layout */}
+                      <div className="sm:hidden space-y-1.5">
+                        <div className="flex items-start gap-2.5">
+                          <span
+                            className={`w-6 h-6 rounded-full text-xs font-black flex items-center justify-center shrink-0 shadow-2xs mt-0.5 ${badgeColor}`}
+                          >
+                            {idx + 1}
+                          </span>
+
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-start justify-between gap-2">
+                              <span className="text-sm font-bold text-slate-900 leading-snug">
+                                {card.english_text}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => speakSentence(card.english_text, idx)}
+                                className="w-8 h-8 rounded-full bg-blue-500 hover:bg-blue-600 active:scale-95 text-white flex items-center justify-center shrink-0 shadow-xs"
+                                title="Dinle"
+                              >
+                                <Play className="w-3.5 h-3.5 fill-current ml-0.5" />
+                              </button>
+                            </div>
+
+                            <p className="text-xs text-slate-600 font-medium mt-1">
+                              {card.turkish_text}
+                            </p>
+
+                            {card.pronunciation && (
+                              <button
+                                type="button"
+                                onClick={() => speakSentence(card.english_text, idx)}
+                                className="mt-1.5 text-left text-[11px] font-semibold text-indigo-700 bg-indigo-50/90 border border-indigo-100/80 px-2 py-0.5 rounded-md inline-flex items-center gap-1"
+                              >
+                                <Volume2 className="w-3 h-3 text-indigo-500 shrink-0" />
+                                <span>{card.pronunciation}</span>
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+
+          {/* Bottom Guidance Cards (Listen, Read, Repeat) */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-2">
+            <div className="flex items-center gap-3 p-3 rounded-2xl bg-blue-50/80 border border-blue-100 text-blue-900">
+              <div className="w-8 h-8 rounded-xl bg-blue-500 text-white flex items-center justify-center shrink-0 shadow-2xs">
+                <Volume2 className="w-4 h-4" />
+              </div>
+              <div>
+                <div className="text-xs font-bold">Dinle (Listen)</div>
+                <div className="text-[11px] text-blue-700/80 font-normal">Mavi butona basarak cümleyi dinleyin.</div>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3 p-3 rounded-2xl bg-rose-50/80 border border-rose-100 text-rose-900">
+              <div className="w-8 h-8 rounded-xl bg-rose-500 text-white flex items-center justify-center shrink-0 shadow-2xs">
+                <BookOpen className="w-4 h-4" />
+              </div>
+              <div>
+                <div className="text-xs font-bold">Oku (Read)</div>
+                <div className="text-[11px] text-rose-700/80 font-normal">İngilizce ve Türkçesini takip edin.</div>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3 p-3 rounded-2xl bg-emerald-50/80 border border-emerald-100 text-emerald-900">
+              <div className="w-8 h-8 rounded-xl bg-emerald-500 text-white flex items-center justify-center shrink-0 shadow-2xs">
+                <Sparkles className="w-4 h-4" />
+              </div>
+              <div>
+                <div className="text-xs font-bold">Tekrar Et (Repeat)</div>
+                <div className="text-[11px] text-emerald-700/80 font-normal">Okunuş rehberiyle sesli tekrar edin!</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ========================================================= */}
       {/* MODE 1: FLASHCARDS                                        */}

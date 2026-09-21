@@ -52,7 +52,7 @@ interface StoryPageInput {
 }
 
 export default function AdminPage() {
-  const [activeTab, setActiveTab] = useState<'create-set' | 'manage-classes' | 'all-sets' | 'stories' | 'tests'>('create-set');
+  const [activeTab, setActiveTab] = useState<'create-set' | 'story-set' | 'manage-classes' | 'all-sets' | 'stories' | 'tests'>('create-set');
   const [classes, setClasses] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -79,6 +79,30 @@ export default function AdminPage() {
   const [uploadingPageImgIndex, setUploadingPageImgIndex] = useState<number | null>(null);
   const [uploadingPageAudioIndex, setUploadingPageAudioIndex] = useState<number | null>(null);
   const [uploadingCover, setUploadingCover] = useState(false);
+
+  // Story Set (10 Cümlelik Kısa Hikaye) Form State
+  const [storySetTitle, setStorySetTitle] = useState('');
+  const [storySetSubtitle, setStorySetSubtitle] = useState('');
+  const [storySetQuote, setStorySetQuote] = useState('');
+  const [storySetCoverUrl, setStorySetCoverUrl] = useState('');
+  const [storySetClassId, setStorySetClassId] = useState('');
+  const [storySetFolderId, setStorySetFolderId] = useState('');
+  const [storyRows, setStoryRows] = useState<{ english_text: string; turkish_text: string; pronunciation: string }[]>([
+    { english_text: '', turkish_text: '', pronunciation: '' },
+    { english_text: '', turkish_text: '', pronunciation: '' },
+    { english_text: '', turkish_text: '', pronunciation: '' },
+    { english_text: '', turkish_text: '', pronunciation: '' },
+    { english_text: '', turkish_text: '', pronunciation: '' },
+    { english_text: '', turkish_text: '', pronunciation: '' },
+    { english_text: '', turkish_text: '', pronunciation: '' },
+    { english_text: '', turkish_text: '', pronunciation: '' },
+    { english_text: '', turkish_text: '', pronunciation: '' },
+    { english_text: '', turkish_text: '', pronunciation: '' },
+  ]);
+  const [showStoryBulkModal, setShowStoryBulkModal] = useState(false);
+  const [storyBulkInput, setStoryBulkInput] = useState('');
+  const [isSubmittingStorySet, setIsSubmittingStorySet] = useState(false);
+  const [createdStorySetUrl, setCreatedStorySetUrl] = useState<string | null>(null);
 
   // Edit Mode state
   const [editingSetId, setEditingSetId] = useState<string | null>(null);
@@ -195,6 +219,113 @@ export default function AdminPage() {
     const cls = classes.find((c) => c.id === selectedClassId);
     return cls?.folders || [];
   }, [selectedClassId, classes]);
+
+  const availableStorySetFolders = useMemo(() => {
+    if (!storySetClassId) return [];
+    const cls = classes.find((c) => c.id === storySetClassId);
+    return cls?.folders || [];
+  }, [storySetClassId, classes]);
+
+  const handleAddStoryRow = () => {
+    setStoryRows([...storyRows, { english_text: '', turkish_text: '', pronunciation: '' }]);
+  };
+
+  const handleUpdateStoryRow = (
+    index: number,
+    field: 'english_text' | 'turkish_text' | 'pronunciation',
+    val: string
+  ) => {
+    const updated = [...storyRows];
+    updated[index][field] = val;
+    setStoryRows(updated);
+  };
+
+  const handleRemoveStoryRow = (index: number) => {
+    if (storyRows.length <= 1) {
+      setStoryRows([{ english_text: '', turkish_text: '', pronunciation: '' }]);
+      return;
+    }
+    setStoryRows(storyRows.filter((_, i) => i !== index));
+  };
+
+  const handleApplyStoryBulkPaste = () => {
+    if (!storyBulkInput.trim()) return;
+    const lines = storyBulkInput.trim().split('\n');
+    const parsed = lines
+      .map((line) => {
+        const parts = line.split('\t');
+        return {
+          english_text: (parts[0] || '').trim(),
+          turkish_text: (parts[1] || '').trim(),
+          pronunciation: (parts[2] || '').trim(),
+        };
+      })
+      .filter((r) => r.english_text || r.turkish_text);
+
+    if (parsed.length > 0) {
+      setStoryRows(parsed);
+      setShowStoryBulkModal(false);
+      setStoryBulkInput('');
+      showToast(`${parsed.length} cümle tabloya aktarıldı!`);
+    } else {
+      showToast('Geçerli veri bulunamadı.', 'error');
+    }
+  };
+
+  const handleSaveStorySet = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!storySetTitle.trim()) {
+      showToast('Lütfen story başlığı yazın.', 'error');
+      return;
+    }
+    const validRows = storyRows.filter((r) => r.english_text.trim());
+    if (validRows.length === 0) {
+      showToast('Lütfen en az 1 cümle ekleyin.', 'error');
+      return;
+    }
+
+    let targetFolderId = storySetFolderId;
+    if (!targetFolderId && availableStorySetFolders.length > 0) {
+      targetFolderId = availableStorySetFolders[0].id;
+    }
+
+    try {
+      setIsSubmittingStorySet(true);
+      const encodedDesc = encodeSetDescription('', storySetCoverUrl, '', {
+        isStory: true,
+        subtitle: storySetSubtitle.trim(),
+        quote: storySetQuote.trim(),
+      });
+
+      const payload = {
+        folder_id: targetFolderId,
+        title: storySetTitle.trim(),
+        description: encodedDesc,
+        cards: validRows.map((r, idx) => ({
+          english_text: r.english_text.trim(),
+          turkish_text: r.turkish_text.trim(),
+          pronunciation: r.pronunciation.trim(),
+          order_index: idx + 1,
+        })),
+      };
+
+      const res = await fetch('/api/admin/create-set', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Story kaydedilemedi.');
+
+      setCreatedStorySetUrl(data.shareUrl || `/set/${data.set.slug}`);
+      showToast('Story başarıyla oluşturuldu ve yayına alındı!');
+      loadHierarchy();
+    } catch (err: any) {
+      showToast(err.message, 'error');
+    } finally {
+      setIsSubmittingStorySet(false);
+    }
+  };
 
   const handleAddCardRow = () => {
     setCards([...cards, { english_text: '', turkish_text: '', image_url: '' }]);
@@ -1002,6 +1133,21 @@ export default function AdminPage() {
         </button>
 
         <button
+          onClick={() => {
+            setActiveTab('story-set');
+            handleCancelEdit();
+          }}
+          className={`flex-1 py-2.5 px-3 sm:px-4 rounded-xl text-xs sm:text-sm font-semibold transition-all flex items-center justify-center gap-1.5 ${
+            activeTab === 'story-set'
+              ? 'bg-white text-amber-700 shadow-sm'
+              : 'text-slate-600 hover:text-slate-900 font-medium'
+          }`}
+        >
+          <Sparkles className="w-4 h-4 text-amber-500" />
+          <span>Story (10 Cümle)</span>
+        </button>
+
+        <button
           onClick={() => setActiveTab('manage-classes')}
           className={`flex-1 py-2.5 px-4 rounded-xl text-xs sm:text-sm font-semibold transition-all flex items-center justify-center gap-2 ${
             activeTab === 'manage-classes'
@@ -1667,6 +1813,375 @@ export default function AdminPage() {
                     className="px-5 py-2 rounded-xl bg-brand-600 text-white text-xs font-semibold hover:bg-brand-700 shadow-sm"
                   >
                     Kartlara Aktar
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ================================================================= */}
+      {/* TAB 1.5: 10 CÜMLELİK STORY OLUŞTURMA                              */}
+      {/* ================================================================= */}
+      {activeTab === 'story-set' && (
+        <div className="space-y-6">
+          {/* Success Banner */}
+          {createdStorySetUrl && (
+            <div className="p-6 rounded-3xl bg-amber-50 border-2 border-amber-300 space-y-4 shadow-sm animate-in fade-in">
+              <div className="flex items-center gap-3 text-amber-900">
+                <CheckCircle2 className="w-7 h-7 text-amber-600 shrink-0" />
+                <div>
+                  <h3 className="text-lg font-bold">Harika! Story Başarıyla Yayında!</h3>
+                  <p className="text-xs font-normal text-amber-800 mt-0.5">
+                    Öğrencileriniz hem 10 cümlelik görsel tablodan sesli dinleyebilir hem de Kartlar, Test ve Yaz modlarında çalışabilir.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-3 pt-1">
+                <Link
+                  href={createdStorySetUrl}
+                  className="px-4 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold shadow-sm flex items-center gap-1.5"
+                >
+                  <span>Story'yi Hemen Aç ve İncele</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </Link>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    const fullUrl = window.location.origin + createdStorySetUrl;
+                    navigator.clipboard.writeText(fullUrl);
+                    showToast('Link kopyalandı!');
+                  }}
+                  className="px-4 py-2.5 rounded-xl bg-white border border-amber-300 text-amber-900 text-xs font-semibold hover:bg-amber-100 flex items-center gap-1.5"
+                >
+                  <Copy className="w-3.5 h-3.5" />
+                  <span>Linki Kopyala</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    const fullUrl = window.location.origin + createdStorySetUrl;
+                    const text = encodeURIComponent(
+                      `Sevgili öğrenciler, "${storySetTitle}" çalışmamız hazır:\n${fullUrl}`
+                    );
+                    window.open(`https://api.whatsapp.com/send?text=${text}`, '_blank');
+                  }}
+                  className="px-4 py-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-semibold flex items-center gap-1.5 shadow-sm"
+                >
+                  <Send className="w-3.5 h-3.5" />
+                  <span>WhatsApp'ta Paylaş</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCreatedStorySetUrl(null);
+                    setStorySetTitle('');
+                    setStorySetSubtitle('');
+                    setStorySetQuote('');
+                    setStorySetCoverUrl('');
+                    setStoryRows([
+                      { english_text: '', turkish_text: '', pronunciation: '' },
+                      { english_text: '', turkish_text: '', pronunciation: '' },
+                      { english_text: '', turkish_text: '', pronunciation: '' },
+                      { english_text: '', turkish_text: '', pronunciation: '' },
+                      { english_text: '', turkish_text: '', pronunciation: '' },
+                      { english_text: '', turkish_text: '', pronunciation: '' },
+                      { english_text: '', turkish_text: '', pronunciation: '' },
+                      { english_text: '', turkish_text: '', pronunciation: '' },
+                      { english_text: '', turkish_text: '', pronunciation: '' },
+                      { english_text: '', turkish_text: '', pronunciation: '' },
+                    ]);
+                  }}
+                  className="ml-auto text-xs font-medium text-slate-500 hover:underline"
+                >
+                  + Yeni Bir Story Daha Oluştur
+                </button>
+              </div>
+            </div>
+          )}
+
+          <form onSubmit={handleSaveStorySet} className="space-y-6">
+            {/* 1. Başlık, Alt Başlık ve Modül Seçimi */}
+            <div className="bg-white rounded-3xl border border-slate-200/80 p-6 shadow-sm space-y-4">
+              <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                <Sparkles className="w-5 h-5 text-amber-500" />
+                <span>1. Story Başlığı, Alt Başlık ve Modül Bağlama</span>
+              </h2>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs font-medium text-slate-700 block mb-1">
+                    Story Başlığı:
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={storySetTitle}
+                    onChange={(e) => setStorySetTitle(e.target.value)}
+                    placeholder="Örn: This Is My Story 1"
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 font-bold"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-medium text-slate-700 block mb-1">
+                    Alt Başlık / Konu:
+                  </label>
+                  <input
+                    type="text"
+                    value={storySetSubtitle}
+                    onChange={(e) => setStorySetSubtitle(e.target.value)}
+                    placeholder="Örn: I am in the bathroom."
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-medium text-slate-700 block mb-1">
+                    Hangi Modüle Eklenecek?
+                  </label>
+                  <select
+                    value={storySetClassId}
+                    onChange={(e) => {
+                      setStorySetClassId(e.target.value);
+                      setStorySetFolderId('');
+                    }}
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 bg-white"
+                  >
+                    <option value="">-- Modül Seçin --</option>
+                    {classes.map((cls: any) => (
+                      <option key={cls.id} value={cls.id}>
+                        {cls.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-xs font-medium text-slate-700 block mb-1">
+                    Klasör Seçimi (Opsiyonel):
+                  </label>
+                  <select
+                    value={storySetFolderId}
+                    onChange={(e) => setStorySetFolderId(e.target.value)}
+                    disabled={!storySetClassId || availableStorySetFolders.length === 0}
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 bg-white disabled:bg-slate-50 disabled:text-slate-400"
+                  >
+                    <option value="">-- Ana Klasör (Varsayılan) --</option>
+                    {availableStorySetFolders.map((f: any) => (
+                      <option key={f.id} value={f.id}>
+                        📁 {f.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-xs font-medium text-slate-700 block mb-1">
+                    Sahne / Kapak Görseli URL:
+                  </label>
+                  <input
+                    type="url"
+                    value={storySetCoverUrl}
+                    onChange={(e) => setStorySetCoverUrl(e.target.value)}
+                    placeholder="https://... (Örn: Catbox linki veya görsel URL)"
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
+                  />
+                  {storySetCoverUrl && (
+                    <div className="mt-2 w-20 h-20 rounded-xl overflow-hidden border border-slate-200">
+                      <img src={storySetCoverUrl} alt="Preview" className="w-full h-full object-cover" />
+                    </div>
+                  )}
+                </div>
+
+                <div>
+                  <label className="text-xs font-medium text-slate-700 block mb-1">
+                    Motivasyonel Alıntı / Not (İsteğe Bağlı):
+                  </label>
+                  <input
+                    type="text"
+                    value={storySetQuote}
+                    onChange={(e) => setStorySetQuote(e.target.value)}
+                    placeholder='Örn: "Good habits make a happy day!"'
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* 2. 10 Cümlelik Tablo & Toplu Yapıştır */}
+            <div className="bg-white rounded-3xl border border-slate-200/80 p-6 shadow-sm space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-slate-100">
+                <div>
+                  <h2 className="text-base font-bold text-slate-900">
+                    2. Hikaye Cümleleri (İngilizce - Türkçe - Okunuş)
+                  </h2>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    10 cümlenin İngilizce, Türkçe ve telaffuz rehberini girin. Kartlar, test ve yaz modları otomatik oluşacaktır.
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setShowStoryBulkModal(true)}
+                  className="px-4 py-2 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 hover:bg-amber-100 text-xs font-bold flex items-center gap-1.5 transition-all shadow-2xs w-fit"
+                >
+                  <FileText className="w-4 h-4 text-amber-600" />
+                  <span>📋 Excel'den Toplu Yapıştır</span>
+                </button>
+              </div>
+
+              {/* Table */}
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse min-w-[650px]">
+                  <thead>
+                    <tr className="border-b border-slate-200 text-xs font-bold text-slate-500 uppercase tracking-wider">
+                      <th className="py-2.5 px-3 w-12 text-center">#</th>
+                      <th className="py-2.5 px-3">İngilizce Cümle (Zorunlu)</th>
+                      <th className="py-2.5 px-3">Türkçe Karşılığı (Zorunlu)</th>
+                      <th className="py-2.5 px-3">Okunuşu (Telaffuz Kılavuzu)</th>
+                      <th className="py-2.5 px-2 w-12 text-center">Sil</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {storyRows.map((row, idx) => (
+                      <tr key={idx} className="hover:bg-slate-50/60 transition-colors">
+                        <td className="py-2 px-3 text-center">
+                          <span className="w-6 h-6 rounded-full bg-slate-100 text-slate-700 text-xs font-bold inline-flex items-center justify-center">
+                            {idx + 1}
+                          </span>
+                        </td>
+                        <td className="py-2 px-3">
+                          <input
+                            type="text"
+                            value={row.english_text}
+                            onChange={(e) => handleUpdateStoryRow(idx, 'english_text', e.target.value)}
+                            placeholder={idx === 0 ? "Örn: I go to the bathroom." : "İngilizce cümle..."}
+                            className="w-full px-3 py-1.5 rounded-lg border border-slate-200 text-xs sm:text-sm font-semibold text-slate-900 focus:outline-none focus:ring-1 focus:ring-amber-500"
+                          />
+                        </td>
+                        <td className="py-2 px-3">
+                          <input
+                            type="text"
+                            value={row.turkish_text}
+                            onChange={(e) => handleUpdateStoryRow(idx, 'turkish_text', e.target.value)}
+                            placeholder={idx === 0 ? "Örn: Banyoya giderim." : "Türkçe karşılığı..."}
+                            className="w-full px-3 py-1.5 rounded-lg border border-slate-200 text-xs sm:text-sm font-medium text-slate-700 focus:outline-none focus:ring-1 focus:ring-amber-500"
+                          />
+                        </td>
+                        <td className="py-2 px-3">
+                          <input
+                            type="text"
+                            value={row.pronunciation}
+                            onChange={(e) => handleUpdateStoryRow(idx, 'pronunciation', e.target.value)}
+                            placeholder={idx === 0 ? "Örn: Ay go tu di baethrum." : "Türkçe okunuşu..."}
+                            className="w-full px-3 py-1.5 rounded-lg border border-slate-200 text-xs sm:text-sm font-normal text-indigo-700 focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-indigo-50/30"
+                          />
+                        </td>
+                        <td className="py-2 px-2 text-center">
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveStoryRow(idx)}
+                            className="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+                            title="Satırı Sil"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="pt-2">
+                <button
+                  type="button"
+                  onClick={handleAddStoryRow}
+                  className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold flex items-center gap-1.5 transition-colors"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>+ Yeni Cümle Satırı Ekle</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Submit Bar */}
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <button
+                type="submit"
+                disabled={isSubmittingStorySet}
+                className="px-8 py-3 rounded-2xl bg-amber-600 hover:bg-amber-700 active:scale-95 text-white font-bold text-sm shadow-md shadow-amber-500/20 flex items-center gap-2 transition-all disabled:opacity-50"
+              >
+                {isSubmittingStorySet ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    <span>Story Kaydediliyor...</span>
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="w-4 h-4" />
+                    <span>Story'yi Kaydet ve Yayınla 🚀</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </form>
+
+          {/* Bulk Paste Modal */}
+          {showStoryBulkModal && (
+            <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+              <div className="bg-white rounded-3xl p-6 max-w-xl w-full shadow-2xl space-y-4 animate-in fade-in zoom-in-95">
+                <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                  <h3 className="font-bold text-slate-900 text-base flex items-center gap-2">
+                    <FileText className="w-5 h-5 text-amber-600" />
+                    <span>Excel'den Toplu Cümle Yapıştır</span>
+                  </h3>
+                  <button
+                    type="button"
+                    onClick={() => setShowStoryBulkModal(false)}
+                    className="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg text-lg"
+                  >
+                    ✕
+                  </button>
+                </div>
+
+                <div className="space-y-2">
+                  <p className="text-xs text-slate-600 leading-relaxed">
+                    Excel tablonuzdan 3 sütunu (<strong>İngilizce</strong>, <strong>Türkçe</strong> ve <strong>Okunuş</strong>) seçip kopyalayın ve aşağıdaki kutuya doğrudan yapıştırın:
+                  </p>
+                  <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-[11px] text-slate-500 font-mono">
+                    I go to the bathroom. [TAB] Banyoya giderim. [TAB] Ay go tu di baethrum.<br/>
+                    I turn on the tap. [TAB] Musluğu açarım. [TAB] Ay törn on dı tep.
+                  </div>
+                  <textarea
+                    rows={8}
+                    value={storyBulkInput}
+                    onChange={(e) => setStoryBulkInput(e.target.value)}
+                    placeholder="Excel verinizi buraya yapıştırın..."
+                    className="w-full p-3 rounded-xl border border-slate-200 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-amber-500"
+                  />
+                </div>
+
+                <div className="flex items-center justify-end gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowStoryBulkModal(false)}
+                    className="px-4 py-2 rounded-xl text-xs font-medium text-slate-600 hover:bg-slate-100"
+                  >
+                    Vazgeç
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleApplyStoryBulkPaste}
+                    className="px-5 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold shadow-xs"
+                  >
+                    Tabloya Aktar
                   </button>
                 </div>
               </div>

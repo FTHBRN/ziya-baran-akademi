@@ -108,18 +108,19 @@ export default function ModuleDetailPage() {
 
     (sets || []).forEach((s) => {
       const decoded = decodeSetDescription(s.description);
+      const isStory = decoded.storyMeta?.isStory;
       list.push({
         id: `set-${s.id}`,
         rawId: s.id,
-        type: 'set',
-        typeLabel: 'Kelime Seti',
+        type: isStory ? 'story-set' : 'set',
+        typeLabel: isStory ? 'Story (10 Cümle)' : 'Kelime Seti',
         title: s.title,
-        description: decoded.description || '',
+        description: isStory && decoded.storyMeta?.subtitle ? decoded.storyMeta.subtitle : (decoded.description || ''),
         imageUrl: decoded.coverImageUrl || '',
-        icon: '🗂️',
-        badgeColor: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-        metaInfo: `${s.set_cards?.length || 0} Kart`,
-        actionLabel: 'Çalış',
+        icon: isStory ? '🌟' : '🗂️',
+        badgeColor: isStory ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-emerald-50 text-emerald-700 border-emerald-200',
+        metaInfo: `${s.set_cards?.length || 0} ${isStory ? 'Cümle' : 'Kart'}`,
+        actionLabel: isStory ? 'Hikayeye Başla' : 'Çalış',
         href: `/set/${s.slug}`,
         orderIndex: s.order_index ?? 0,
         createdAt: s.created_at || '',
