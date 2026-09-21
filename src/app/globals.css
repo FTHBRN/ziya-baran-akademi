@@ -40,6 +40,13 @@
   }
 }
 
+html,
+body {
+  max-width: 100%;
+  overflow-x: hidden;
+  overscroll-behavior-x: none;
+}
+
 body {
   background-color: #f8fafc;
   color: #1e293b;
@@ -51,4 +58,5 @@ body {
 
 * {
   -webkit-tap-highlight-color: transparent;
+  box-sizing: border-box;
 }

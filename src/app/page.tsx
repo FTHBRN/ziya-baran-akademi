@@ -6,15 +6,10 @@ import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { decodeModuleMetadata, MODULE_THEMES } from '@/lib/module-utils';
 import {
-  Compass,
   Search,
-  Heart,
-  User,
   ArrowRight,
   ChevronRight,
   Sparkles,
-  BookOpen,
-  Layers,
   GraduationCap,
   X
 } from 'lucide-react';
@@ -25,7 +20,6 @@ export default function HomePage() {
   const [loading, setLoading] = useState(true);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [activeBottomNav, setActiveBottomNav] = useState<'kesfet' | 'ara' | 'favoriler' | 'profil'>('kesfet');
 
   useEffect(() => {
     async function loadModules() {
@@ -63,7 +57,7 @@ export default function HomePage() {
   }, [modules, searchQuery]);
 
   return (
-    <div className="select-none pb-24 sm:pb-12">
+    <div className="select-none pb-8 sm:pb-12">
       {/* Search Modal Overlay */}
       {searchOpen && (
         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-start justify-center pt-20 px-4">
@@ -76,7 +70,6 @@ export default function HomePage() {
               <button
                 onClick={() => {
                   setSearchOpen(false);
-                  setActiveBottomNav('kesfet');
                 }}
                 className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-500"
               >
@@ -291,63 +284,6 @@ export default function HomePage() {
           )}
         </div>
       </div>
-
-      {/* =================================================================== */}
-      {/* MOBILE BOTTOM NAVIGATION BAR: Matches Image 2                      */}
-      {/* =================================================================== */}
-      <nav className="fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-slate-200/90 py-2 px-6 flex sm:hidden items-center justify-around shadow-lg">
-        <button
-          onClick={() => {
-            setActiveBottomNav('kesfet');
-            setSearchOpen(false);
-          }}
-          className={`flex flex-col items-center gap-1 transition-colors ${
-            activeBottomNav === 'kesfet' ? 'text-purple-600 font-bold' : 'text-slate-400 hover:text-slate-600 font-medium'
-          }`}
-        >
-          <Compass className="w-5 h-5" />
-          <span className="text-[10px]">Keşfet</span>
-        </button>
-
-        <button
-          onClick={() => {
-            setActiveBottomNav('ara');
-            setSearchOpen(true);
-          }}
-          className={`flex flex-col items-center gap-1 transition-colors ${
-            activeBottomNav === 'ara' ? 'text-purple-600 font-bold' : 'text-slate-400 hover:text-slate-600 font-medium'
-          }`}
-        >
-          <Search className="w-5 h-5" />
-          <span className="text-[10px]">Ara</span>
-        </button>
-
-        <button
-          onClick={() => {
-            setActiveBottomNav('favoriler');
-            router.push('/module/this-is-my-story');
-          }}
-          className={`flex flex-col items-center gap-1 transition-colors ${
-            activeBottomNav === 'favoriler' ? 'text-purple-600 font-bold' : 'text-slate-400 hover:text-slate-600 font-medium'
-          }`}
-        >
-          <Heart className="w-5 h-5" />
-          <span className="text-[10px]">Favorilerim</span>
-        </button>
-
-        <button
-          onClick={() => {
-            setActiveBottomNav('profil');
-            router.push('/admin');
-          }}
-          className={`flex flex-col items-center gap-1 transition-colors ${
-            activeBottomNav === 'profil' ? 'text-purple-600 font-bold' : 'text-slate-400 hover:text-slate-600 font-medium'
-          }`}
-        >
-          <User className="w-5 h-5" />
-          <span className="text-[10px]">Yönetim</span>
-        </button>
-      </nav>
     </div>
   );
 }

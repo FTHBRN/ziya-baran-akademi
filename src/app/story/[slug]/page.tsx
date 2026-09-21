@@ -388,24 +388,22 @@ export default function StoryReaderPage() {
             <span>A</span>
             <span className="text-[10px] text-brand-600 font-semibold uppercase">{fontSize}</span>
           </button>
+
+          <div className="w-[1px] h-4 bg-slate-200 mx-0.5" />
+
+          {/* Page Counter Badge */}
+          <span className="text-[11px] font-bold text-purple-700 bg-purple-50 px-2 py-0.5 rounded-lg shrink-0">
+            {currentPageIndex + 1} / {pages.length}
+          </span>
         </div>
       </div>
 
-      {/* Progress Bar & Page Navigation Header */}
-      <div className="space-y-1.5">
-        <div className="flex items-center justify-between text-xs font-semibold text-slate-600">
-          <span className="flex items-center gap-1.5">
-            <BookOpen className="w-4 h-4 text-brand-600" />
-            <span>Sayfa {currentPageIndex + 1} / {pages.length}</span>
-          </span>
-          <span className="text-slate-400 font-normal">%{progressPercent} tamamlandı</span>
-        </div>
-        <div className="w-full bg-slate-200/80 h-2 rounded-full overflow-hidden">
-          <div
-            className="bg-brand-600 h-full rounded-full transition-all duration-300 ease-out"
-            style={{ width: `${progressPercent}%` }}
-          />
-        </div>
+      {/* Slimline 2px Progress Line (Takes virtually no vertical space) */}
+      <div className="w-full bg-slate-100 h-1 rounded-full overflow-hidden">
+        <div
+          className="bg-purple-600 h-full rounded-full transition-all duration-300 ease-out"
+          style={{ width: `${progressPercent}%` }}
+        />
       </div>
 
       {/* Celebration Finished Screen */}

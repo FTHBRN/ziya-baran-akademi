@@ -454,7 +454,7 @@ export default function SetStudyPage() {
           </h1>
         </div>
 
-        {/* Right: Konu Anlatımı (if exists) */}
+        {/* Right: Konu Anlatımı (if exists) & Card Counter */}
         <div className="flex items-center gap-1.5 shrink-0">
           {studyNotes && (
             <button
@@ -467,7 +467,18 @@ export default function SetStudyPage() {
               <span className="hidden sm:inline">Konu Anlatımı</span>
             </button>
           )}
+          <span className="text-xs font-bold text-slate-700 bg-white border border-slate-200 px-2.5 py-1.5 rounded-xl shadow-2xs">
+            {cardIndex + 1} / {cards.length}
+          </span>
         </div>
+      </div>
+
+      {/* Slimline 2px Progress Line (Takes virtually no vertical space) */}
+      <div className="w-full bg-slate-100 h-1 rounded-full overflow-hidden">
+        <div
+          className="bg-brand-600 h-full rounded-full transition-all duration-300 ease-out"
+          style={{ width: `${Math.round(((cardIndex + 1) / cards.length) * 100)}%` }}
+        />
       </div>
 
       {/* Mode Switcher Tabs (Shortened) */}
@@ -518,22 +529,17 @@ export default function SetStudyPage() {
       {/* MODE 1: FLASHCARDS                                        */}
       {/* ========================================================= */}
       {mode === 'flashcards' && (
-        <div className="space-y-6">
-          {/* Card Progress & Controls */}
-          <div className="flex items-center justify-between text-xs font-medium text-slate-500">
-            <span>
-              Kart {cardIndex + 1} / {cards.length}
+        <div className="space-y-3">
+          {/* Subtle Swipe Hint on Mobile */}
+          <div className="flex items-center justify-end text-xs text-slate-400">
+            <span className="hidden sm:inline">← / → yön tuşları veya Space</span>
+            <span className="sm:hidden text-[10px] text-slate-400 font-medium">
+              👆 Sağa/Sola Kaydırın
             </span>
-            <div className="flex items-center gap-1.5 text-slate-400">
-              <span className="hidden sm:inline">← / → yön tuşları veya Space</span>
-              <span className="sm:hidden text-[11px] bg-slate-100 px-2 py-0.5 rounded-full text-slate-500 font-medium">
-                👆 Sağa/Sola Kaydırın
-              </span>
-            </div>
           </div>
 
-          {/* Slide & Swipe Animation Container */}
-          <div className="overflow-hidden py-2 -my-2 px-1 -mx-1">
+          {/* Slide & Swipe Animation Container (Clean w-full without negative margins) */}
+          <div className="overflow-hidden py-1 w-full">
             <div
               style={getSlideStyle()}
               onClick={handleCardClick}
