@@ -454,19 +454,8 @@ export default function SetStudyPage() {
           </h1>
         </div>
 
-        {/* Right: Konu Anlatımı (if exists) & Card Counter */}
-        <div className="flex items-center gap-1.5 shrink-0">
-          {studyNotes && (
-            <button
-              type="button"
-              onClick={() => setShowNotesModal(true)}
-              className="px-2.5 py-1.5 rounded-xl text-xs font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 shadow-2xs transition-all active:scale-95 flex items-center gap-1"
-              title="Konu Anlatımı"
-            >
-              <BookOpen className="w-3.5 h-3.5 text-indigo-600" />
-              <span className="hidden sm:inline">Konu Anlatımı</span>
-            </button>
-          )}
+        {/* Right: Card Counter */}
+        <div className="flex items-center shrink-0">
           <span className="text-xs font-bold text-slate-700 bg-white border border-slate-200 px-2.5 py-1.5 rounded-xl shadow-2xs">
             {cardIndex + 1} / {cards.length}
           </span>
@@ -480,6 +469,20 @@ export default function SetStudyPage() {
           style={{ width: `${Math.round(((cardIndex + 1) / cards.length) * 100)}%` }}
         />
       </div>
+
+      {/* Centered Konu Anlatımı Button (Prominent & Balanced) */}
+      {studyNotes && (
+        <div className="flex justify-center pt-0.5">
+          <button
+            type="button"
+            onClick={() => setShowNotesModal(true)}
+            className="inline-flex items-center gap-2 px-4 py-1.5 sm:px-5 sm:py-2 rounded-full text-xs sm:text-sm font-bold text-indigo-700 bg-indigo-50/90 hover:bg-indigo-100 border border-indigo-200 shadow-2xs hover:shadow-xs transition-all active:scale-95 group"
+          >
+            <BookOpen className="w-4 h-4 text-indigo-600 group-hover:scale-110 transition-transform" />
+            <span>Konu Anlatımı & Notlar</span>
+          </button>
+        </div>
+      )}
 
       {/* Mode Switcher Tabs (Shortened) */}
       <div className="grid grid-cols-3 gap-1 bg-slate-200/70 p-1 rounded-2xl">

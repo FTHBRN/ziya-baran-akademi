@@ -1,10 +1,16 @@
 import './globals.css';
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import AppShell from '@/components/layout/AppShell';
 
 export const metadata: Metadata = {
   title: 'Ziya Baran Akademi | İngilizce Öğrenme Platformu',
   description: 'Ziya Baran Akademi interaktif İngilizce kelime setleri, testler ve hikâyeler.',
+};
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
 };
 
 export default function RootLayout({
