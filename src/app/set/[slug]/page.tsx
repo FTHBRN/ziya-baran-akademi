@@ -460,6 +460,7 @@ export default function SetStudyPage() {
 
   const currentCard = cards[cardIndex];
   const { description: cleanDesc, coverImageUrl, studyNotes, storyMeta } = decodeSetDescription(setInfo.description);
+  const hasImages = useMemo(() => cards.some((c) => !!c.image_url), [cards]);
 
   return (
     <div className={`mx-auto space-y-3 sm:space-y-5 ${mode === 'story' ? 'max-w-7xl' : 'max-w-3xl'}`}>
@@ -613,8 +614,15 @@ export default function SetStudyPage() {
             {/* Right Column: Sentence List / Table (Expands to fill remaining space) */}
             <div className="flex-1 min-w-0 w-full bg-white rounded-3xl border border-slate-200/80 shadow-sm p-3.5 sm:p-6 space-y-2">
               {/* Desktop Table Header */}
-              <div className="hidden sm:grid grid-cols-[36px_minmax(0,1.8fr)_minmax(0,1.3fr)_minmax(210px,auto)] gap-4 px-3.5 py-2 text-[11px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100">
+              <div
+                className={`hidden sm:grid ${
+                  hasImages
+                    ? 'grid-cols-[36px_68px_minmax(0,1.8fr)_minmax(0,1.3fr)_minmax(190px,auto)]'
+                    : 'grid-cols-[36px_minmax(0,1.8fr)_minmax(0,1.3fr)_minmax(210px,auto)]'
+                } gap-4 px-3.5 py-2 text-[11px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100 items-center`}
+              >
                 <div className="text-center">#</div>
+                {hasImages && <div className="text-center">Görsel</div>}
                 <div className="flex items-center gap-1.5">
                   <span>🇬🇧 İngilizce</span>
                 </div>
@@ -635,8 +643,14 @@ export default function SetStudyPage() {
                         isPlaying ? 'bg-brand-50/70 ring-1 ring-brand-200 shadow-2xs' : 'hover:bg-slate-50/70'
                       }`}
                     >
-                      {/* Desktop Grid Layout (Spacious, Single-line Pronunciation) */}
-                      <div className="hidden sm:grid grid-cols-[36px_minmax(0,1.8fr)_minmax(0,1.3fr)_minmax(210px,auto)] gap-4 items-center">
+                      {/* Desktop Grid Layout (Spacious, Single-line Pronunciation + Image) */}
+                      <div
+                        className={`hidden sm:grid ${
+                          hasImages
+                            ? 'grid-cols-[36px_68px_minmax(0,1.8fr)_minmax(0,1.3fr)_minmax(190px,auto)]'
+                            : 'grid-cols-[36px_minmax(0,1.8fr)_minmax(0,1.3fr)_minmax(210px,auto)]'
+                        } gap-4 items-center`}
+                      >
                         {/* Number Badge */}
                         <div className="flex justify-center">
                           <span
@@ -645,6 +659,25 @@ export default function SetStudyPage() {
                             {idx + 1}
                           </span>
                         </div>
+
+                        {/* Image Thumbnail */}
+                        {hasImages && (
+                          <div className="flex justify-center">
+                            {card.image_url ? (
+                              <div className="w-14 h-14 rounded-xl overflow-hidden shadow-2xs border border-slate-200/80 bg-slate-50 shrink-0">
+                                <img
+                                  src={card.image_url}
+                                  alt=""
+                                  className="w-full h-full object-cover hover:scale-110 transition-transform duration-300"
+                                />
+                              </div>
+                            ) : (
+                              <div className="w-14 h-14 rounded-xl border border-dashed border-slate-200 bg-slate-50/50 flex items-center justify-center text-slate-300 text-xs font-semibold">
+                                -
+                              </div>
+                            )}
+                          </div>
+                        )}
 
                         {/* English with Play Button */}
                         <div className="flex items-center gap-3 min-w-0">
@@ -684,14 +717,23 @@ export default function SetStudyPage() {
                         </div>
                       </div>
 
-                      {/* Mobile Card / Touch-Friendly Layout */}
+                      {/* Mobile Card / Touch-Friendly Layout with Image */}
                       <div className="sm:hidden space-y-1.5">
                         <div className="flex items-start gap-2.5">
-                          <span
-                            className={`w-6 h-6 rounded-full text-xs font-black flex items-center justify-center shrink-0 shadow-2xs mt-0.5 ${badgeColor}`}
-                          >
-                            {idx + 1}
-                          </span>
+                          <div className="flex flex-col items-center gap-1.5 shrink-0">
+                            <span
+                              className={`w-6 h-6 rounded-full text-xs font-black flex items-center justify-center shadow-2xs ${badgeColor}`}
+                            >
+                              {idx + 1}
+                            </span>
+                            {card.image_url && (
+                              <img
+                                src={card.image_url}
+                                alt=""
+                                className="w-14 h-14 rounded-xl object-cover shadow-2xs border border-slate-200/80 bg-slate-50"
+                              />
+                            )}
+                          </div>
 
                           <div className="flex-1 min-w-0">
                             <div className="flex items-start justify-between gap-2">
@@ -755,7 +797,7 @@ export default function SetStudyPage() {
               onTouchStart={handleTouchStart}
               onTouchMove={handleTouchMove}
               onTouchEnd={handleTouchEnd}
-              className="w-full h-80 sm:h-96 perspective-1000 cursor-pointer select-none touch-pan-y"
+              className="w-full h-[22rem] sm:h-[26rem] perspective-1000 cursor-pointer select-none touch-pan-y"
             >
               <div
                 className={`relative w-full h-full transform-style-preserve-3d flip-card-transition ${
@@ -790,7 +832,7 @@ export default function SetStudyPage() {
 
                   <div className="text-center space-y-4 my-auto">
                     {currentCard.image_url && (
-                      <div className="w-28 h-28 sm:w-36 sm:h-36 mx-auto rounded-2xl overflow-hidden shadow-sm border border-slate-100 bg-slate-50">
+                      <div className="w-36 h-36 sm:w-52 sm:h-52 mx-auto rounded-2xl overflow-hidden shadow-sm border border-slate-100 bg-slate-50">
                         <img
                           src={currentCard.image_url}
                           alt="Visual"
@@ -843,7 +885,7 @@ export default function SetStudyPage() {
 
                   <div className="text-center space-y-3 my-auto px-4">
                     {currentCard.image_url && (
-                      <div className="w-24 h-24 sm:w-32 sm:h-32 mx-auto rounded-2xl overflow-hidden shadow-sm border border-white/20 bg-white/10 mb-2">
+                      <div className="w-32 h-32 sm:w-48 sm:h-48 mx-auto rounded-2xl overflow-hidden shadow-sm border border-white/20 bg-white/10 mb-2">
                         <img
                           src={currentCard.image_url}
                           alt="Visual"
@@ -938,7 +980,7 @@ export default function SetStudyPage() {
               {/* Question Text */}
               <div className="text-center py-4 space-y-3">
                 {currentQuizCard?.image_url && (
-                  <div className="w-24 h-24 sm:w-32 sm:h-32 mx-auto rounded-2xl overflow-hidden shadow-sm border border-slate-100 bg-slate-50 mb-2">
+                  <div className="w-36 h-36 sm:w-48 sm:h-48 mx-auto rounded-2xl overflow-hidden shadow-sm border border-slate-100 bg-slate-50 mb-3">
                     <img
                       src={currentQuizCard.image_url}
                       alt="Visual"
@@ -1085,7 +1127,7 @@ export default function SetStudyPage() {
 
           <div className="text-center py-2 space-y-2">
             {cards[writingIndex]?.image_url && (
-              <div className="w-24 h-24 sm:w-32 sm:h-32 mx-auto rounded-2xl overflow-hidden shadow-sm border border-slate-100 bg-slate-50 mb-2">
+              <div className="w-36 h-36 sm:w-48 sm:h-48 mx-auto rounded-2xl overflow-hidden shadow-sm border border-slate-100 bg-slate-50 mb-3">
                 <img
                   src={cards[writingIndex].image_url}
                   alt="Visual"
