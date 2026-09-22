@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import { decodeSetDescription } from '@/lib/set-utils';
 import { decodeCardTurkish } from '@/lib/card-utils';
+import { triggerHaptic } from '@/lib/haptics';
 
 const BADGE_COLORS = [
   'bg-rose-500 text-white',
@@ -166,6 +167,7 @@ export default function SetStudyPage() {
 
   const triggerNext = () => {
     if (slideStatus !== 'idle') return;
+    triggerHaptic('light');
     setSlideStatus('exit-left');
     setTimeout(() => {
       setIsFlipped(false);
@@ -180,6 +182,7 @@ export default function SetStudyPage() {
 
   const triggerPrev = () => {
     if (slideStatus !== 'idle') return;
+    triggerHaptic('light');
     setSlideStatus('exit-right');
     setTimeout(() => {
       setIsFlipped(false);
@@ -314,6 +317,7 @@ export default function SetStudyPage() {
       triggerPrev();
     } else if (!touchMovedRef.current) {
       // Tap without swipe -> Flip Card
+      triggerHaptic('light');
       setIsFlipped((prev) => !prev);
       setDragOffset(0);
     } else {
@@ -335,6 +339,7 @@ export default function SetStudyPage() {
     if (Date.now() - lastTouchTimeRef.current < 450) {
       return;
     }
+    triggerHaptic('light');
     setIsFlipped((prev) => !prev);
   };
 
@@ -369,6 +374,9 @@ export default function SetStudyPage() {
 
     if (opt.trim().toLowerCase() === correctAnswer.trim().toLowerCase()) {
       setQuizScore((prev) => prev + 1);
+      triggerHaptic('success');
+    } else {
+      triggerHaptic('error');
     }
   };
 
@@ -379,6 +387,7 @@ export default function SetStudyPage() {
       setIsAnswerChecked(false);
     } else {
       setQuizFinished(true);
+      triggerHaptic('success');
       confetti({
         particleCount: 100,
         spread: 70,
@@ -414,9 +423,11 @@ export default function SetStudyPage() {
 
     if (cleanUser === cleanTarget) {
       setWritingStatus('correct');
+      triggerHaptic('success');
       speak(currentCard.english_text);
     } else {
       setWritingStatus('wrong');
+      triggerHaptic('error');
     }
   };
 
@@ -862,7 +873,10 @@ export default function SetStudyPage() {
             </button>
 
             <button
-              onClick={() => setIsFlipped(!isFlipped)}
+              onClick={() => {
+                triggerHaptic('light');
+                setIsFlipped(!isFlipped);
+              }}
               className="py-3 px-4 sm:px-6 rounded-xl bg-slate-100 hover:bg-slate-200 font-semibold text-sm text-slate-700 transition-all flex items-center justify-center gap-1.5 shadow-xs active:scale-95"
               title="Kartı Çevir"
             >

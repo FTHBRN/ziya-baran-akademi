@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 import { decodePageTexts } from '@/lib/story-utils';
 import confetti from 'canvas-confetti';
+import { triggerHaptic } from '@/lib/haptics';
 import {
   ArrowLeft,
   ArrowRight,
@@ -225,9 +226,11 @@ export default function StoryReaderPage() {
 
   const goToNextPage = () => {
     if (currentPageIndex < pages.length - 1) {
+      triggerHaptic('light');
       setCurrentPageIndex((prev) => prev + 1);
     } else if (currentPageIndex === pages.length - 1 && !isFinished) {
       setIsFinished(true);
+      triggerHaptic('success');
       confetti({
         particleCount: 80,
         spread: 70,
@@ -238,6 +241,7 @@ export default function StoryReaderPage() {
 
   const goToPrevPage = () => {
     if (currentPageIndex > 0) {
+      triggerHaptic('light');
       setCurrentPageIndex((prev) => prev - 1);
       setIsFinished(false);
     }

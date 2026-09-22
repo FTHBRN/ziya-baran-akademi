@@ -16,6 +16,7 @@ import {
   HelpCircle,
   Home,
 } from 'lucide-react';
+import { triggerHaptic } from '@/lib/haptics';
 
 interface Question {
   id: string;
@@ -90,6 +91,9 @@ export default function StudentTestPage() {
     const isCorrect = letter.toUpperCase() === currentQ.correct_option.toUpperCase();
     if (isCorrect) {
       setScore((prev) => prev + 1);
+      triggerHaptic('success');
+    } else {
+      triggerHaptic('error');
     }
 
     setUserAnswers((prev) => [
@@ -100,11 +104,13 @@ export default function StudentTestPage() {
 
   const handleNextQuestion = () => {
     if (currentIndex + 1 < questions.length) {
+      triggerHaptic('light');
       setCurrentIndex((prev) => prev + 1);
       setSelectedOption(null);
       setIsAnswerChecked(false);
     } else {
       setIsFinished(true);
+      triggerHaptic('success');
       confetti({
         particleCount: 120,
         spread: 80,

@@ -9,7 +9,20 @@ const config: CapacitorConfig = {
     cleartext: true,
   },
   ios: {
-    contentInset: 'always',
+    contentInset: 'automatic',
+  },
+  plugins: {
+    SplashScreen: {
+      launchAutoHide: false,
+      backgroundColor: '#0b132b',
+      showSpinner: false,
+      splashFullScreen: true,
+      splashImmersive: true,
+    },
+    StatusBar: {
+      style: 'DARK',
+      backgroundColor: '#0b132b',
+    },
   },
 };
 
