@@ -153,6 +153,13 @@ export default function AdminPage() {
   const [isCreatingClass, setIsCreatingClass] = useState(false);
   const [isCreatingFolder, setIsCreatingFolder] = useState(false);
 
+  // Inline Folder Creation state (for quick folder adding from set/story creation)
+  const [showInlineFolderModal, setShowInlineFolderModal] = useState(false);
+  const [inlineFolderClassId, setInlineFolderClassId] = useState('');
+  const [inlineFolderName, setInlineFolderName] = useState('');
+  const [isCreatingInlineFolder, setIsCreatingInlineFolder] = useState(false);
+  const [inlineFolderTargetContext, setInlineFolderTargetContext] = useState<'set' | 'storySet'>('set');
+
   // Module Editing state
   const [editingModule, setEditingModule] = useState<any | null>(null);
   const [editModuleName, setEditModuleName] = useState('');
@@ -770,6 +777,42 @@ export default function AdminPage() {
     }
   };
 
+  const handleCreateInlineFolder = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!inlineFolderName.trim() || !inlineFolderClassId) return;
+
+    setIsCreatingInlineFolder(true);
+    try {
+      const res = await fetch('/api/admin/classes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'folder',
+          class_id: inlineFolderClassId,
+          name: inlineFolderName.trim(),
+        }),
+      });
+      const data = await res.json();
+      if (data.success && data.item) {
+        showToast(`"${inlineFolderName}" klasörü oluşturuldu ve seçildi! ✨`);
+        await loadHierarchy();
+        if (inlineFolderTargetContext === 'set') {
+          setSelectedFolderId(data.item.id);
+        } else {
+          setStorySetFolderId(data.item.id);
+        }
+        setInlineFolderName('');
+        setShowInlineFolderModal(false);
+      } else {
+        throw new Error(data.error || 'Klasör oluşturulamadı');
+      }
+    } catch (err: any) {
+      showToast(err.message, 'error');
+    } finally {
+      setIsCreatingInlineFolder(false);
+    }
+  };
+
   const allSetsList = useMemo(() => {
     const list: any[] = [];
     classes.forEach((c) => {
@@ -1379,9 +1422,25 @@ export default function AdminPage() {
 
                     {/* Step 2: Select Folder within that Class */}
                     <div>
-                      <label className="text-[11px] font-medium text-slate-500 block mb-1">
-                        2. O Sınıfın Klasörünü Seçin:
-                      </label>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="text-[11px] font-medium text-slate-500">
+                          2. O Sınıfın Klasörünü Seçin:
+                        </label>
+                        {selectedClassId && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setInlineFolderClassId(selectedClassId);
+                              setInlineFolderTargetContext('set');
+                              setShowInlineFolderModal(true);
+                            }}
+                            className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 hover:underline flex items-center gap-1"
+                          >
+                            <FolderPlus className="w-3 h-3" />
+                            <span>+ Yeni Klasör Aç</span>
+                          </button>
+                        )}
+                      </div>
                       <select
                         disabled={!selectedClassId}
                         value={selectedFolderId}
@@ -1963,9 +2022,25 @@ export default function AdminPage() {
                 </div>
 
                 <div>
-                  <label className="text-xs font-medium text-slate-700 block mb-1">
-                    Klasör Seçimi (Opsiyonel):
-                  </label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-xs font-medium text-slate-700">
+                      Klasör Seçimi (Opsiyonel):
+                    </label>
+                    {storySetClassId && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setInlineFolderClassId(storySetClassId);
+                          setInlineFolderTargetContext('storySet');
+                          setShowInlineFolderModal(true);
+                        }}
+                        className="text-[11px] font-bold text-amber-700 hover:text-amber-900 hover:underline flex items-center gap-1"
+                      >
+                        <FolderPlus className="w-3 h-3" />
+                        <span>+ Yeni Klasör Aç</span>
+                      </button>
+                    )}
+                  </div>
                   <select
                     value={storySetFolderId}
                     onChange={(e) => setStorySetFolderId(e.target.value)}
@@ -3443,6 +3518,65 @@ export default function AdminPage() {
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {showInlineFolderModal && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <form
+            onSubmit={handleCreateInlineFolder}
+            className="bg-white rounded-3xl p-6 max-w-md w-full space-y-4 shadow-2xl animate-in zoom-in-95 duration-150"
+          >
+            <div className="flex items-center justify-between border-b pb-3">
+              <h3 className="font-bold text-slate-900 text-base flex items-center gap-2">
+                <FolderPlus className="w-5 h-5 text-indigo-600" />
+                <span>Yeni Klasör Oluştur</span>
+              </h3>
+              <button
+                type="button"
+                onClick={() => setShowInlineFolderModal(false)}
+                className="text-slate-400 hover:text-slate-600 font-bold"
+              >
+                ✕
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-600 font-normal">
+              Seçili modül: <b>"{classes.find((c: any) => c.id === inlineFolderClassId)?.name || 'Modül'}"</b>
+            </p>
+
+            <div>
+              <label className="text-xs font-medium text-slate-700 block mb-1">
+                Klasör / Konu Adı:
+              </label>
+              <input
+                type="text"
+                required
+                autoFocus
+                value={inlineFolderName}
+                onChange={(e) => setInlineFolderName(e.target.value)}
+                placeholder="Örn: Fiiller, Günlük Kalıplar, Ünite 1..."
+                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm font-medium text-slate-800 bg-slate-50 focus:bg-white focus:outline-none focus:border-indigo-500"
+              />
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowInlineFolderModal(false)}
+                className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100"
+              >
+                Vazgeç
+              </button>
+              <button
+                type="submit"
+                disabled={isCreatingInlineFolder || !inlineFolderName.trim()}
+                className="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold shadow-sm disabled:opacity-50"
+              >
+                {isCreatingInlineFolder ? 'Oluşturuluyor...' : 'Klasörü Oluştur'}
+              </button>
+            </div>
+          </form>
         </div>
       )}
     </div>
