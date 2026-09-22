@@ -460,7 +460,7 @@ export default function SetStudyPage() {
 
   const currentCard = cards[cardIndex];
   const { description: cleanDesc, coverImageUrl, studyNotes, storyMeta } = decodeSetDescription(setInfo.description);
-  const hasImages = useMemo(() => cards.some((c) => !!c.image_url), [cards]);
+  const hasImages = cards.some((c) => !!c.image_url);
 
   return (
     <div className={`mx-auto space-y-3 sm:space-y-5 ${mode === 'story' ? 'max-w-7xl' : 'max-w-3xl'}`}>
