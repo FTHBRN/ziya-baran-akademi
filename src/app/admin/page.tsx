@@ -29,6 +29,9 @@ import {
   ChevronDown,
   Sparkles,
   CheckSquare,
+  Palette,
+  Loader2,
+  Wand2,
 } from 'lucide-react';
 import { decodePageTexts } from '@/lib/story-utils';
 import { encodeSetDescription, decodeSetDescription } from '@/lib/set-utils';
@@ -87,17 +90,17 @@ export default function AdminPage() {
   const [storySetCoverUrl, setStorySetCoverUrl] = useState('');
   const [storySetClassId, setStorySetClassId] = useState('');
   const [storySetFolderId, setStorySetFolderId] = useState('');
-  const [storyRows, setStoryRows] = useState<{ english_text: string; turkish_text: string; pronunciation: string }[]>([
-    { english_text: '', turkish_text: '', pronunciation: '' },
-    { english_text: '', turkish_text: '', pronunciation: '' },
-    { english_text: '', turkish_text: '', pronunciation: '' },
-    { english_text: '', turkish_text: '', pronunciation: '' },
-    { english_text: '', turkish_text: '', pronunciation: '' },
-    { english_text: '', turkish_text: '', pronunciation: '' },
-    { english_text: '', turkish_text: '', pronunciation: '' },
-    { english_text: '', turkish_text: '', pronunciation: '' },
-    { english_text: '', turkish_text: '', pronunciation: '' },
-    { english_text: '', turkish_text: '', pronunciation: '' },
+  const [storyRows, setStoryRows] = useState<{ english_text: string; turkish_text: string; pronunciation: string; image_url?: string }[]>([
+    { english_text: '', turkish_text: '', pronunciation: '', image_url: '' },
+    { english_text: '', turkish_text: '', pronunciation: '', image_url: '' },
+    { english_text: '', turkish_text: '', pronunciation: '', image_url: '' },
+    { english_text: '', turkish_text: '', pronunciation: '', image_url: '' },
+    { english_text: '', turkish_text: '', pronunciation: '', image_url: '' },
+    { english_text: '', turkish_text: '', pronunciation: '', image_url: '' },
+    { english_text: '', turkish_text: '', pronunciation: '', image_url: '' },
+    { english_text: '', turkish_text: '', pronunciation: '', image_url: '' },
+    { english_text: '', turkish_text: '', pronunciation: '', image_url: '' },
+    { english_text: '', turkish_text: '', pronunciation: '', image_url: '' },
   ]);
   const [showStoryBulkModal, setShowStoryBulkModal] = useState(false);
   const [storyBulkInput, setStoryBulkInput] = useState('');
@@ -141,6 +144,31 @@ export default function AdminPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [createdSetUrl, setCreatedSetUrl] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
+
+  // AI Image Generation states
+  const [aiGeneratingIndex, setAiGeneratingIndex] = useState<number | null>(null);
+  const [aiGeneratingStoryRowIndex, setAiGeneratingStoryRowIndex] = useState<number | null>(null);
+  const [aiGeneratingCover, setAiGeneratingCover] = useState(false);
+  const [aiGeneratingStoryCover, setAiGeneratingStoryCover] = useState(false);
+  
+  // Batch AI Generation Modal/Progress state
+  const [aiBatchProgress, setAiBatchProgress] = useState<{
+    isOpen: boolean;
+    title: string;
+    current: number;
+    total: number;
+    currentText: string;
+    latestImageUrl?: string;
+  } | null>(null);
+
+  // Set-level AI Generation Modal for "Tüm Setler" list
+  const [aiSetModal, setAiSetModal] = useState<{
+    isOpen: boolean;
+    set: any;
+    onlyMissing: boolean;
+    isLoading: boolean;
+    progressText: string;
+  } | null>(null);
 
   // Module / Folder Creation in Tab 2
   const [newClassName, setNewClassName] = useState('');
@@ -234,12 +262,12 @@ export default function AdminPage() {
   }, [storySetClassId, classes]);
 
   const handleAddStoryRow = () => {
-    setStoryRows([...storyRows, { english_text: '', turkish_text: '', pronunciation: '' }]);
+    setStoryRows([...storyRows, { english_text: '', turkish_text: '', pronunciation: '', image_url: '' }]);
   };
 
   const handleUpdateStoryRow = (
     index: number,
-    field: 'english_text' | 'turkish_text' | 'pronunciation',
+    field: 'english_text' | 'turkish_text' | 'pronunciation' | 'image_url',
     val: string
   ) => {
     const updated = [...storyRows];
@@ -249,7 +277,7 @@ export default function AdminPage() {
 
   const handleRemoveStoryRow = (index: number) => {
     if (storyRows.length <= 1) {
-      setStoryRows([{ english_text: '', turkish_text: '', pronunciation: '' }]);
+      setStoryRows([{ english_text: '', turkish_text: '', pronunciation: '', image_url: '' }]);
       return;
     }
     setStoryRows(storyRows.filter((_, i) => i !== index));
@@ -265,6 +293,7 @@ export default function AdminPage() {
           english_text: (parts[0] || '').trim(),
           turkish_text: (parts[1] || '').trim(),
           pronunciation: (parts[2] || '').trim(),
+          image_url: (parts[3] || '').trim(),
         };
       })
       .filter((r) => r.english_text || r.turkish_text);
@@ -298,7 +327,12 @@ export default function AdminPage() {
 
     try {
       setIsSubmittingStorySet(true);
-      const encodedDesc = encodeSetDescription('', storySetCoverUrl, '', {
+      let coverUrl = storySetCoverUrl.trim();
+      if (!coverUrl && validRows[0]?.image_url) {
+        coverUrl = validRows[0].image_url;
+      }
+
+      const encodedDesc = encodeSetDescription('', coverUrl, '', {
         isStory: true,
         subtitle: storySetSubtitle.trim(),
         quote: storySetQuote.trim(),
@@ -312,6 +346,7 @@ export default function AdminPage() {
           english_text: r.english_text.trim(),
           turkish_text: r.turkish_text.trim(),
           pronunciation: r.pronunciation.trim(),
+          image_url: r.image_url || null,
           order_index: idx + 1,
         })),
       };
@@ -534,6 +569,343 @@ export default function AdminPage() {
       { english_text: '', turkish_text: '', image_url: '' },
       { english_text: '', turkish_text: '', image_url: '' },
     ]);
+  };
+
+  // --- AI Image Generation Handlers ---
+
+  // Single Card AI Image Generation
+  const handleGenerateSingleCardImage = async (index: number) => {
+    const card = cards[index];
+    if (!card || !card.english_text.trim()) {
+      showToast('Lütfen önce İngilizce cümle/kelime yazın.', 'error');
+      return;
+    }
+
+    try {
+      setAiGeneratingIndex(index);
+      const res = await fetch('/api/admin/generate-ai-image', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'single',
+          text: card.english_text.trim(),
+          turkishText: card.turkish_text.trim(),
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Görsel üretilemedi.');
+      }
+
+      handleUpdateCard(index, 'image_url', data.imageUrl);
+
+      if (!setCoverUrl.trim() && index === 0) {
+        setSetCoverUrl(data.imageUrl);
+      }
+
+      showToast('Görsel başarıyla çizildi ve karta eklendi!');
+    } catch (err: any) {
+      console.error(err);
+      showToast('AI Görsel Hatası: ' + err.message, 'error');
+    } finally {
+      setAiGeneratingIndex(null);
+    }
+  };
+
+  // Set Cover AI Image Generation
+  const handleGenerateSetCoverImage = async () => {
+    if (!setTitle.trim()) {
+      showToast('Lütfen önce set için bir başlık yazın.', 'error');
+      return;
+    }
+
+    try {
+      setAiGeneratingCover(true);
+      const res = await fetch('/api/admin/generate-ai-image', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'single',
+          text: setTitle.trim(),
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Kapak görseli üretilemedi.');
+      }
+
+      setSetCoverUrl(data.imageUrl);
+      showToast('Kapak görseli başarıyla çizildi!');
+    } catch (err: any) {
+      console.error(err);
+      showToast('Kapak Görsel Hatası: ' + err.message, 'error');
+    } finally {
+      setAiGeneratingCover(false);
+    }
+  };
+
+  // Batch AI Generation for all cards in Set Editor
+  const handleGenerateAllCardsImages = async () => {
+    const validCardIndexes: number[] = [];
+    cards.forEach((c, idx) => {
+      if (c.english_text.trim()) validCardIndexes.push(idx);
+    });
+
+    if (validCardIndexes.length === 0) {
+      showToast('Lütfen önce en az 1 İngilizce kart ekleyin.', 'error');
+      return;
+    }
+
+    setAiBatchProgress({
+      isOpen: true,
+      title: 'Tüm Kartlar İçin AI Çizim Yapılıyor',
+      current: 0,
+      total: validCardIndexes.length,
+      currentText: 'Başlatılıyor...',
+    });
+
+    let successCount = 0;
+    const updatedCards = [...cards];
+
+    for (let i = 0; i < validCardIndexes.length; i++) {
+      const idx = validCardIndexes[i];
+      const card = updatedCards[idx];
+
+      setAiBatchProgress({
+        isOpen: true,
+        title: 'Tüm Kartlar İçin AI Çizim Yapılıyor',
+        current: i + 1,
+        total: validCardIndexes.length,
+        currentText: card.english_text,
+        latestImageUrl: updatedCards[idx].image_url,
+      });
+
+      try {
+        const res = await fetch('/api/admin/generate-ai-image', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'single',
+            text: card.english_text.trim(),
+            turkishText: card.turkish_text.trim(),
+          }),
+        });
+
+        const data = await res.json();
+        if (res.ok && data.success && data.imageUrl) {
+          updatedCards[idx].image_url = data.imageUrl;
+          setCards([...updatedCards]);
+
+          if (!setCoverUrl.trim() && i === 0) {
+            setSetCoverUrl(data.imageUrl);
+          }
+
+          successCount++;
+          setAiBatchProgress((prev) => (prev ? { ...prev, latestImageUrl: data.imageUrl } : null));
+        }
+      } catch (e: any) {
+        console.error(`Kart ${idx + 1} için çizim hatası:`, e);
+      }
+
+      if (i < validCardIndexes.length - 1) {
+        await new Promise((r) => setTimeout(r, 1200));
+      }
+    }
+
+    setAiBatchProgress(null);
+    showToast(`${successCount} / ${validCardIndexes.length} kartın görseli başarıyla çizildi!`);
+  };
+
+  // Single Story Row AI Image Generation
+  const handleGenerateSingleStoryRowImage = async (index: number) => {
+    const row = storyRows[index];
+    if (!row || !row.english_text.trim()) {
+      showToast('Lütfen önce İngilizce cümle yazın.', 'error');
+      return;
+    }
+
+    try {
+      setAiGeneratingStoryRowIndex(index);
+      const res = await fetch('/api/admin/generate-ai-image', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'single',
+          text: row.english_text.trim(),
+          turkishText: row.turkish_text.trim(),
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Görsel üretilemedi.');
+      }
+
+      handleUpdateStoryRow(index, 'image_url', data.imageUrl);
+
+      if (!storySetCoverUrl.trim() && index === 0) {
+        setStorySetCoverUrl(data.imageUrl);
+      }
+
+      showToast('Cümle görseli başarıyla çizildi!');
+    } catch (err: any) {
+      console.error(err);
+      showToast('AI Görsel Hatası: ' + err.message, 'error');
+    } finally {
+      setAiGeneratingStoryRowIndex(null);
+    }
+  };
+
+  // Story Set Cover AI Image Generation
+  const handleGenerateStorySetCoverImage = async () => {
+    if (!storySetTitle.trim()) {
+      showToast('Lütfen önce story başlığı yazın.', 'error');
+      return;
+    }
+
+    try {
+      setAiGeneratingStoryCover(true);
+      const res = await fetch('/api/admin/generate-ai-image', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'single',
+          text: storySetTitle.trim(),
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Kapak görseli üretilemedi.');
+      }
+
+      setStorySetCoverUrl(data.imageUrl);
+      showToast('Story kapağı başarıyla çizildi!');
+    } catch (err: any) {
+      console.error(err);
+      showToast('Kapak Hatası: ' + err.message, 'error');
+    } finally {
+      setAiGeneratingStoryCover(false);
+    }
+  };
+
+  // Batch AI Generation for all Story Rows
+  const handleGenerateAllStoryRowsImages = async () => {
+    const validIndexes: number[] = [];
+    storyRows.forEach((r, idx) => {
+      if (r.english_text.trim()) validIndexes.push(idx);
+    });
+
+    if (validIndexes.length === 0) {
+      showToast('Lütfen önce en az 1 İngilizce cümle ekleyin.', 'error');
+      return;
+    }
+
+    setAiBatchProgress({
+      isOpen: true,
+      title: '10 Cümle İçin Çizimler Yapılıyor',
+      current: 0,
+      total: validIndexes.length,
+      currentText: 'Başlatılıyor...',
+    });
+
+    let successCount = 0;
+    const updatedRows = [...storyRows];
+
+    for (let i = 0; i < validIndexes.length; i++) {
+      const idx = validIndexes[i];
+      const row = updatedRows[idx];
+
+      setAiBatchProgress({
+        isOpen: true,
+        title: '10 Cümle İçin Çizimler Yapılıyor',
+        current: i + 1,
+        total: validIndexes.length,
+        currentText: row.english_text,
+        latestImageUrl: updatedRows[idx].image_url,
+      });
+
+      try {
+        const res = await fetch('/api/admin/generate-ai-image', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'single',
+            text: row.english_text.trim(),
+            turkishText: row.turkish_text.trim(),
+          }),
+        });
+
+        const data = await res.json();
+        if (res.ok && data.success && data.imageUrl) {
+          updatedRows[idx].image_url = data.imageUrl;
+          setStoryRows([...updatedRows]);
+
+          if (!storySetCoverUrl.trim() && i === 0) {
+            setStorySetCoverUrl(data.imageUrl);
+          }
+
+          successCount++;
+          setAiBatchProgress((prev) => (prev ? { ...prev, latestImageUrl: data.imageUrl } : null));
+        }
+      } catch (e: any) {
+        console.error(`Cümle ${idx + 1} çizim hatası:`, e);
+      }
+
+      if (i < validIndexes.length - 1) {
+        await new Promise((r) => setTimeout(r, 1200));
+      }
+    }
+
+    setAiBatchProgress(null);
+    showToast(`${successCount} / ${validIndexes.length} cümlenin görseli başarıyla çizildi!`);
+  };
+
+  // Open Set AI Modal from "Tüm Setler"
+  const handleOpenSetAiModal = (s: any) => {
+    setAiSetModal({
+      isOpen: true,
+      set: s,
+      onlyMissing: true,
+      isLoading: false,
+      progressText: '',
+    });
+  };
+
+  // Run Set AI Generation from Modal
+  const handleRunSetAiGeneration = async () => {
+    if (!aiSetModal || !aiSetModal.set) return;
+
+    setAiSetModal((prev) =>
+      prev ? { ...prev, isLoading: true, progressText: 'Çizimler başlatılıyor...' } : null
+    );
+
+    try {
+      const res = await fetch('/api/admin/generate-ai-image', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'set',
+          setId: aiSetModal.set.id,
+          onlyMissing: aiSetModal.onlyMissing,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Set görselleri üretilemedi.');
+      }
+
+      showToast(`Set başarıyla güncellendi! ${data.results?.length || 0} kart çizildi.`);
+      setAiSetModal(null);
+      loadHierarchy();
+    } catch (err: any) {
+      console.error(err);
+      showToast('Set Çizim Hatası: ' + err.message, 'error');
+      setAiSetModal((prev) => (prev ? { ...prev, isLoading: false } : null));
+    }
   };
 
   const handleDeleteSet = async (setId: string, title: string) => {
@@ -1361,14 +1733,28 @@ export default function AdminPage() {
                     Set Kapak Görseli URL'si (İsteğe Bağlı):
                   </label>
                   <div className="flex items-center gap-3">
-                    <div className="flex-1">
+                    <div className="flex-1 relative">
                       <input
                         type="url"
                         value={setCoverUrl}
                         onChange={(e) => setSetCoverUrl(e.target.value)}
                         placeholder="https://... (Örn: Görsel linki)"
-                        className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs sm:text-sm font-normal text-slate-900 focus:outline-none focus:border-brand-500 bg-slate-50 focus:bg-white"
+                        className="w-full pl-4 pr-20 py-2.5 rounded-xl border border-slate-200 text-xs sm:text-sm font-normal text-slate-900 focus:outline-none focus:border-brand-500 bg-slate-50 focus:bg-white"
                       />
+                      <button
+                        type="button"
+                        onClick={handleGenerateSetCoverImage}
+                        disabled={aiGeneratingCover || !setTitle.trim()}
+                        className="absolute right-1.5 top-1/2 -translate-y-1/2 px-2.5 py-1 rounded-lg bg-purple-50 hover:bg-purple-100 text-purple-700 text-xs font-semibold flex items-center gap-1 disabled:opacity-40 transition-colors"
+                        title="Set Başlığına Göre AI Kapak Çiz"
+                      >
+                        {aiGeneratingCover ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin text-purple-600" />
+                        ) : (
+                          <Sparkles className="w-3.5 h-3.5 text-purple-600" />
+                        )}
+                        <span>AI Çiz</span>
+                      </button>
                     </div>
                     {setCoverUrl && (
                       <div className="w-14 h-11 rounded-xl overflow-hidden border border-slate-200 shrink-0 bg-slate-100 flex items-center justify-center shadow-xs">
@@ -1645,6 +2031,17 @@ export default function AdminPage() {
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
+                    onClick={handleGenerateAllCardsImages}
+                    disabled={cards.every((c) => !c.english_text.trim()) || !!aiBatchProgress?.isOpen}
+                    className="px-3 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-2xs transition-all active:scale-95 disabled:opacity-40"
+                    title="Tüm kartlar için sırayla AI cartoon çizimler üretir"
+                  >
+                    <Sparkles className="w-3.5 h-3.5" />
+                    <span>✨ AI ile Tümünü Çiz</span>
+                  </button>
+
+                  <button
+                    type="button"
                     onClick={() => setShowBulkModal(true)}
                     className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold flex items-center gap-1.5 transition-colors"
                   >
@@ -1746,17 +2143,32 @@ export default function AdminPage() {
                       />
                     </div>
 
-                    <div className="w-full sm:w-40 flex items-center gap-2 shrink-0">
-                      <input
-                        type="url"
-                        value={card.image_url || ''}
-                        onChange={(e) =>
-                          handleUpdateCard(index, 'image_url', e.target.value)
-                        }
-                        placeholder="Görsel URL (opsiyonel)..."
-                        className="w-full px-2.5 py-2 rounded-xl border border-slate-200 text-xs font-normal text-slate-700 bg-white focus:outline-none focus:border-brand-500"
-                        title="İsteğe bağlı kart resmi linki"
-                      />
+                    <div className="w-full sm:w-44 flex items-center gap-1.5 shrink-0">
+                      <div className="relative flex-1">
+                        <input
+                          type="url"
+                          value={card.image_url || ''}
+                          onChange={(e) =>
+                            handleUpdateCard(index, 'image_url', e.target.value)
+                          }
+                          placeholder="Görsel URL..."
+                          className="w-full pl-2 pr-7 py-2 rounded-xl border border-slate-200 text-xs font-normal text-slate-700 bg-white focus:outline-none focus:border-brand-500"
+                          title="İsteğe bağlı kart resmi linki"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => handleGenerateSingleCardImage(index)}
+                          disabled={aiGeneratingIndex === index || !card.english_text.trim()}
+                          className="absolute right-1 top-1/2 -translate-y-1/2 p-1 rounded-md text-purple-600 hover:bg-purple-50 disabled:opacity-30 transition-colors"
+                          title="Bu kart için AI çizim üret"
+                        >
+                          {aiGeneratingIndex === index ? (
+                            <Loader2 className="w-3.5 h-3.5 animate-spin text-purple-600" />
+                          ) : (
+                            <Palette className="w-3.5 h-3.5" />
+                          )}
+                        </button>
+                      </div>
                       {card.image_url && (
                         <div className="w-8 h-8 rounded-lg overflow-hidden border border-slate-200 shrink-0 bg-slate-100 flex items-center justify-center shadow-xs">
                           <img
@@ -2060,18 +2472,36 @@ export default function AdminPage() {
                   <label className="text-xs font-medium text-slate-700 block mb-1">
                     Sahne / Kapak Görseli URL:
                   </label>
-                  <input
-                    type="url"
-                    value={storySetCoverUrl}
-                    onChange={(e) => setStorySetCoverUrl(e.target.value)}
-                    placeholder="https://... (Örn: Catbox linki veya görsel URL)"
-                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
-                  />
-                  {storySetCoverUrl && (
-                    <div className="mt-2 w-20 h-20 rounded-xl overflow-hidden border border-slate-200">
-                      <img src={storySetCoverUrl} alt="Preview" className="w-full h-full object-cover" />
+                  <div className="flex items-center gap-3">
+                    <div className="flex-1 relative">
+                      <input
+                        type="url"
+                        value={storySetCoverUrl}
+                        onChange={(e) => setStorySetCoverUrl(e.target.value)}
+                        placeholder="https://... (Örn: Görsel linki veya Catbox)"
+                        className="w-full pl-4 pr-20 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleGenerateStorySetCoverImage}
+                        disabled={aiGeneratingStoryCover || !storySetTitle.trim()}
+                        className="absolute right-1.5 top-1/2 -translate-y-1/2 px-2.5 py-1 rounded-lg bg-amber-100 hover:bg-amber-200 text-amber-900 text-xs font-semibold flex items-center gap-1 disabled:opacity-40 transition-colors"
+                        title="Hikaye Başlığına Göre AI Kapak Çiz"
+                      >
+                        {aiGeneratingStoryCover ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-700" />
+                        ) : (
+                          <Sparkles className="w-3.5 h-3.5 text-amber-700" />
+                        )}
+                        <span>AI Çiz</span>
+                      </button>
                     </div>
-                  )}
+                    {storySetCoverUrl && (
+                      <div className="w-12 h-12 rounded-xl overflow-hidden border border-slate-200 shrink-0 bg-slate-100 shadow-xs">
+                        <img src={storySetCoverUrl} alt="Preview" className="w-full h-full object-cover" />
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 <div>
@@ -2101,25 +2531,39 @@ export default function AdminPage() {
                   </p>
                 </div>
 
-                <button
-                  type="button"
-                  onClick={() => setShowStoryBulkModal(true)}
-                  className="px-4 py-2 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 hover:bg-amber-100 text-xs font-bold flex items-center gap-1.5 transition-all shadow-2xs w-fit"
-                >
-                  <FileText className="w-4 h-4 text-amber-600" />
-                  <span>📋 Excel'den Toplu Yapıştır</span>
-                </button>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <button
+                    type="button"
+                    onClick={handleGenerateAllStoryRowsImages}
+                    disabled={storyRows.every((r) => !r.english_text.trim()) || !!aiBatchProgress?.isOpen}
+                    className="px-3.5 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-2xs transition-all active:scale-95 disabled:opacity-40"
+                    title="10 cümlenin her biri için AI cartoon görsel üretir"
+                  >
+                    <Sparkles className="w-4 h-4" />
+                    <span>✨ Cümleleri AI ile Çiz</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setShowStoryBulkModal(true)}
+                    className="px-4 py-2 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 hover:bg-amber-100 text-xs font-bold flex items-center gap-1.5 transition-all shadow-2xs w-fit"
+                  >
+                    <FileText className="w-4 h-4 text-amber-600" />
+                    <span>📋 Excel'den Toplu Yapıştır</span>
+                  </button>
+                </div>
               </div>
 
               {/* Table */}
               <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse min-w-[650px]">
+                <table className="w-full text-left border-collapse min-w-[720px]">
                   <thead>
                     <tr className="border-b border-slate-200 text-xs font-bold text-slate-500 uppercase tracking-wider">
                       <th className="py-2.5 px-3 w-12 text-center">#</th>
                       <th className="py-2.5 px-3">İngilizce Cümle (Zorunlu)</th>
                       <th className="py-2.5 px-3">Türkçe Karşılığı (Zorunlu)</th>
                       <th className="py-2.5 px-3">Okunuşu (Telaffuz Kılavuzu)</th>
+                      <th className="py-2.5 px-3 w-32">Görsel (AI)</th>
                       <th className="py-2.5 px-2 w-12 text-center">Sil</th>
                     </tr>
                   </thead>
@@ -2157,6 +2601,33 @@ export default function AdminPage() {
                             placeholder={idx === 0 ? "Örn: Ay go tu di baethrum." : "Türkçe okunuşu..."}
                             className="w-full px-3 py-1.5 rounded-lg border border-slate-200 text-xs sm:text-sm font-normal text-indigo-700 focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-indigo-50/30"
                           />
+                        </td>
+                        <td className="py-2 px-3">
+                          <div className="flex items-center gap-1.5">
+                            {row.image_url ? (
+                              <div className="w-8 h-8 rounded-lg overflow-hidden border border-slate-200 shrink-0 bg-slate-100 shadow-2xs">
+                                <img src={row.image_url} alt="" className="w-full h-full object-cover" />
+                              </div>
+                            ) : (
+                              <div className="w-8 h-8 rounded-lg border border-dashed border-slate-200 shrink-0 flex items-center justify-center text-[10px] text-slate-300">
+                                Yok
+                              </div>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => handleGenerateSingleStoryRowImage(idx)}
+                              disabled={aiGeneratingStoryRowIndex === idx || !row.english_text.trim()}
+                              className="px-2 py-1 rounded-lg bg-purple-50 hover:bg-purple-100 text-purple-700 text-xs font-semibold flex items-center gap-1 transition-colors disabled:opacity-30"
+                              title="Bu cümle için AI çizim üret"
+                            >
+                              {aiGeneratingStoryRowIndex === idx ? (
+                                <Loader2 className="w-3.5 h-3.5 animate-spin text-purple-600" />
+                              ) : (
+                                <Palette className="w-3.5 h-3.5 text-purple-600" />
+                              )}
+                              <span className="hidden sm:inline">{row.image_url ? 'Yenile' : 'Çiz'}</span>
+                            </button>
+                          </div>
                         </td>
                         <td className="py-2 px-2 text-center">
                           <button
@@ -2787,6 +3258,15 @@ export default function AdminPage() {
 
                   {/* Actions */}
                   <div className="flex items-center gap-2 self-end sm:self-auto">
+                    <button
+                      onClick={() => handleOpenSetAiModal(s)}
+                      className="px-2.5 py-1.5 rounded-lg bg-purple-50 hover:bg-purple-100 text-purple-700 text-xs font-semibold flex items-center gap-1 transition-colors"
+                      title="Set Kartları İçin AI Çizim Üret"
+                    >
+                      <Sparkles className="w-3.5 h-3.5 text-purple-600" />
+                      <span className="hidden sm:inline">AI Çiz</span>
+                    </button>
+
                     <button
                       onClick={() => handleStartEdit(s, { id: s.classId }, { id: s.folderId })}
                       className="px-3 py-1.5 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-800 text-xs font-semibold flex items-center gap-1 transition-colors"
@@ -3577,6 +4057,162 @@ export default function AdminPage() {
               </button>
             </div>
           </form>
+        </div>
+      )}
+
+      {/* AI Batch Generation Progress Modal */}
+      {aiBatchProgress?.isOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-900/70 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl p-6 max-w-md w-full space-y-5 shadow-2xl animate-in zoom-in-95 duration-150 border border-purple-100">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-purple-500 to-indigo-600 flex items-center justify-center text-white shadow-md shadow-purple-200 shrink-0">
+                <Sparkles className="w-6 h-6 animate-pulse" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <h3 className="font-bold text-slate-900 text-base">
+                  {aiBatchProgress.title}
+                </h3>
+                <p className="text-xs text-purple-600 font-semibold mt-0.5">
+                  Kart {aiBatchProgress.current} / {aiBatchProgress.total} hazırlanıyor...
+                </p>
+              </div>
+            </div>
+
+            {/* Progress Bar */}
+            <div className="space-y-1.5">
+              <div className="w-full bg-slate-100 h-2.5 rounded-full overflow-hidden">
+                <div
+                  className="bg-gradient-to-r from-purple-600 to-indigo-600 h-full rounded-full transition-all duration-300 ease-out"
+                  style={{
+                    width: `${Math.round((aiBatchProgress.current / Math.max(aiBatchProgress.total, 1)) * 100)}%`,
+                  }}
+                />
+              </div>
+              <div className="flex justify-between text-[11px] text-slate-400 font-medium">
+                <span>İlerleme</span>
+                <span>
+                  %{Math.round((aiBatchProgress.current / Math.max(aiBatchProgress.total, 1)) * 100)}
+                </span>
+              </div>
+            </div>
+
+            {/* Current Text & Preview */}
+            <div className="p-3.5 rounded-2xl bg-purple-50/60 border border-purple-100 flex items-center gap-3">
+              <Loader2 className="w-5 h-5 text-purple-600 animate-spin shrink-0" />
+              <div className="min-w-0 flex-1">
+                <span className="text-[11px] font-semibold text-purple-500 uppercase tracking-wider block">
+                  Çizilen Eylem / Kelime:
+                </span>
+                <p className="text-xs font-bold text-slate-800 truncate">
+                  "{aiBatchProgress.currentText}"
+                </p>
+              </div>
+              {aiBatchProgress.latestImageUrl && (
+                <div className="w-10 h-10 rounded-xl overflow-hidden border border-purple-200 shrink-0 bg-white shadow-xs">
+                  <img
+                    src={aiBatchProgress.latestImageUrl}
+                    alt="Son Çizim"
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+              )}
+            </div>
+
+            <p className="text-[11px] text-center text-slate-400">
+              ⚡ Çizimler cartoon formatında hazırlanıp Supabase bulutunuza kaydediliyor. Lütfen sayfayı kapatmayınız.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* AI Set Generation Modal from "Tüm Setler" */}
+      {aiSetModal?.isOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl p-6 max-w-md w-full space-y-4 shadow-2xl animate-in zoom-in-95 duration-150">
+            <div className="flex items-center gap-3 border-b border-slate-100 pb-3">
+              <div className="w-10 h-10 rounded-2xl bg-purple-100 text-purple-700 flex items-center justify-center shrink-0">
+                <Sparkles className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="font-bold text-slate-900 text-base">
+                  Set Çizimleri Üret (AI)
+                </h3>
+                <p className="text-xs text-slate-500 truncate max-w-[280px]">
+                  {aiSetModal.set?.title}
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-3 py-1">
+              <p className="text-xs text-slate-600 leading-relaxed">
+                Bu setteki kartlar için modern eğitim odaklı cartoon illüstrasyonlar otomatik çizilip sete eklenecektir.
+              </p>
+
+              <div className="space-y-2 pt-1">
+                <label className="flex items-center gap-2.5 p-3 rounded-xl border border-slate-200 hover:bg-slate-50 cursor-pointer transition-colors text-xs font-medium text-slate-700">
+                  <input
+                    type="radio"
+                    name="aiGenOption"
+                    checked={aiSetModal.onlyMissing}
+                    onChange={() =>
+                      setAiSetModal((prev) => (prev ? { ...prev, onlyMissing: true } : null))
+                    }
+                    className="text-purple-600 focus:ring-purple-500"
+                  />
+                  <span>Yalnızca görseli olmayan kartlar için çiz (Hızlı)</span>
+                </label>
+
+                <label className="flex items-center gap-2.5 p-3 rounded-xl border border-slate-200 hover:bg-slate-50 cursor-pointer transition-colors text-xs font-medium text-slate-700">
+                  <input
+                    type="radio"
+                    name="aiGenOption"
+                    checked={!aiSetModal.onlyMissing}
+                    onChange={() =>
+                      setAiSetModal((prev) => (prev ? { ...prev, onlyMissing: false } : null))
+                    }
+                    className="text-purple-600 focus:ring-purple-500"
+                  />
+                  <span>Tüm kartları yeniden çiz (Görselleri güncelle)</span>
+                </label>
+              </div>
+
+              {aiSetModal.isLoading && (
+                <div className="p-3 rounded-xl bg-purple-50 border border-purple-100 flex items-center gap-2.5 text-xs text-purple-700 font-semibold">
+                  <Loader2 className="w-4 h-4 animate-spin text-purple-600 shrink-0" />
+                  <span>{aiSetModal.progressText || 'Çizimler yapılıyor, lütfen bekleyin...'}</span>
+                </div>
+              )}
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+              <button
+                type="button"
+                disabled={aiSetModal.isLoading}
+                onClick={() => setAiSetModal(null)}
+                className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 disabled:opacity-50"
+              >
+                Vazgeç
+              </button>
+              <button
+                type="button"
+                disabled={aiSetModal.isLoading}
+                onClick={handleRunSetAiGeneration}
+                className="px-5 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-sm disabled:opacity-50 transition-colors"
+              >
+                {aiSetModal.isLoading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>Çiziliyor...</span>
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="w-4 h-4" />
+                    <span>Çizimleri Başlat</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
