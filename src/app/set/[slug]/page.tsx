@@ -597,15 +597,6 @@ export default function SetStudyPage() {
                   <span className="text-xs font-semibold text-slate-400">Görsel Eklenmemiş</span>
                 </div>
               )}
-
-              {storyMeta?.quote && (
-                <div className="bg-amber-50/90 border border-amber-200/80 rounded-2xl p-3.5 flex items-center gap-3 shadow-2xs">
-                  <span className="text-2xl select-none">⭐</span>
-                  <p className="text-xs sm:text-sm font-bold text-amber-950 italic leading-snug">
-                    "{storyMeta.quote}"
-                  </p>
-                </div>
-              )}
             </div>
 
             {/* Right Column: Sentence List / Table (Expands to fill remaining space) */}

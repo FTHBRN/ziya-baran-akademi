@@ -9,7 +9,6 @@ import {
   Search,
   ArrowRight,
   ChevronRight,
-  Sparkles,
   GraduationCap,
   X
 } from 'lucide-react';
@@ -140,23 +139,6 @@ export default function HomePage() {
                 Ziya Baran Akademi
               </p>
             </div>
-
-            {/* Cute Illustration / Graphic Sticker */}
-            <div className="pt-2 flex flex-col items-center text-center space-y-3">
-              <div className="relative w-full py-4 px-3 bg-white/70 rounded-2xl border border-white/80 backdrop-blur-2xs shadow-xs space-y-2">
-                <span className="inline-block text-xs font-bold text-brand-700 bg-brand-50 px-2.5 py-1 rounded-full border border-brand-100">
-                  Better English, A Brighter You! ✨
-                </span>
-                <div className="text-5xl py-2">🧑‍🎓📚</div>
-                {/* 4 Learning Step Badges */}
-                <div className="grid grid-cols-2 gap-1.5 text-[11px] font-bold">
-                  <span className="py-1 px-2 rounded-lg bg-blue-50 text-blue-700">Learn</span>
-                  <span className="py-1 px-2 rounded-lg bg-orange-50 text-orange-700">Practice</span>
-                  <span className="py-1 px-2 rounded-lg bg-emerald-50 text-emerald-700">Grow</span>
-                  <span className="py-1 px-2 rounded-lg bg-purple-50 text-purple-700">Repeat</span>
-                </div>
-              </div>
-            </div>
           </div>
 
           {/* Quick Admin Shortcut */}
@@ -204,12 +186,6 @@ export default function HomePage() {
                   Sana uygun modülü seç ve öğrenmeye başla.
                 </span>
               </p>
-            </div>
-
-            {/* Playful Sticker / Badge on Top Right */}
-            <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full bg-amber-50 border border-amber-200/80 text-xs font-bold text-amber-800 shadow-2xs">
-              <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-              <span>Good Students, Brighter Futures ✨</span>
             </div>
           </div>
 

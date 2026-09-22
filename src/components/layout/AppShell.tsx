@@ -30,15 +30,6 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                 Ziya Baran Akademi
               </span>
             </Link>
-
-            <nav className="flex items-center gap-2 sm:gap-3">
-              <Link
-                href="/"
-                className="px-3.5 py-1.5 rounded-lg text-sm font-semibold text-slate-700 hover:text-brand-600 hover:bg-slate-100 transition-colors"
-              >
-                Dersler
-              </Link>
-            </nav>
           </div>
         </header>
       )}
