@@ -1,10 +1,7 @@
 'use client';
 
-import { useEffect } from 'react';
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
-import { Capacitor } from '@capacitor/core';
-import { SplashScreen } from '@capacitor/splash-screen';
 import OfflineState from '@/components/common/OfflineState';
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
@@ -15,21 +12,6 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     pathname?.startsWith('/set/') ||
     pathname?.startsWith('/test/') ||
     pathname?.startsWith('/story/');
-
-  useEffect(() => {
-    // Native Mobile Integration: Smooth native splash screen dismissal
-    if (Capacitor.isNativePlatform()) {
-      const timer = setTimeout(() => {
-        try {
-          SplashScreen.hide({ fadeOutDuration: 350 }).catch(() => {});
-        } catch {
-          // ignore
-        }
-      }, 150);
-
-      return () => clearTimeout(timer);
-    }
-  }, []);
 
   return (
     <div className="min-h-screen flex flex-col bg-slate-50 text-slate-900 overflow-x-hidden">
