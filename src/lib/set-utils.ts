@@ -46,35 +46,38 @@ export function decodeSetDescription(rawDescription: string | null | undefined):
     return { description: '', coverImageUrl: '', studyNotes: '' };
   }
 
-  let remaining = rawDescription;
+  let text = rawDescription;
   let studyNotes = '';
   let coverImageUrl = '';
   let storyMeta: StoryMetadata | undefined = undefined;
 
-  if (remaining.includes(SET_NOTES_SEPARATOR)) {
-    const parts = remaining.split(SET_NOTES_SEPARATOR);
-    remaining = parts[0];
-    studyNotes = parts.slice(1).join(SET_NOTES_SEPARATOR).trim();
-  }
-
-  if (remaining.includes(SET_COVER_SEPARATOR)) {
-    const parts = remaining.split(SET_COVER_SEPARATOR);
-    remaining = parts[0];
-    coverImageUrl = parts.slice(1).join(SET_COVER_SEPARATOR).trim();
-  }
-
-  if (remaining.includes(SET_STORY_SEPARATOR)) {
-    const parts = remaining.split(SET_STORY_SEPARATOR);
-    remaining = parts[0];
+  // Extract Story Meta if present
+  const storyMatch = text.match(/\n?---STORY_META---\n([\s\S]*?)(?=\n?---(?:COVER_IMAGE|STUDY_NOTES)---|$)/);
+  if (storyMatch) {
     try {
-      storyMeta = JSON.parse(parts.slice(1).join(SET_STORY_SEPARATOR).trim());
+      storyMeta = JSON.parse(storyMatch[1].trim());
     } catch (e) {
       console.error('Story metadata parse error:', e);
     }
+    text = text.replace(storyMatch[0], '');
+  }
+
+  // Extract Cover Image if present
+  const coverMatch = text.match(/\n?---COVER_IMAGE---\n([\s\S]*?)(?=\n?---(?:STORY_META|STUDY_NOTES)---|$)/);
+  if (coverMatch) {
+    coverImageUrl = coverMatch[1].trim();
+    text = text.replace(coverMatch[0], '');
+  }
+
+  // Extract Study Notes if present
+  const notesMatch = text.match(/\n?---STUDY_NOTES---\n([\s\S]*?)(?=\n?---(?:STORY_META|COVER_IMAGE)---|$)/);
+  if (notesMatch) {
+    studyNotes = notesMatch[1].trim();
+    text = text.replace(notesMatch[0], '');
   }
 
   return {
-    description: remaining.trim(),
+    description: text.trim(),
     coverImageUrl,
     studyNotes,
     storyMeta,
