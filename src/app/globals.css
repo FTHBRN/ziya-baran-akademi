@@ -43,8 +43,11 @@
   .pt-safe {
     padding-top: env(safe-area-inset-top, 0px);
   }
+  .pt-safe-tight {
+    padding-top: max(env(safe-area-inset-top, 0px), 8px);
+  }
   .pb-safe {
-    padding-bottom: env(safe-area-inset-bottom, 0px);
+    padding-bottom: max(env(safe-area-inset-bottom, 0px), 12px);
   }
   .pl-safe {
     padding-left: env(safe-area-inset-left, 0px);

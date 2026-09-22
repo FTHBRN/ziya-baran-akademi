@@ -9,7 +9,7 @@ const config: CapacitorConfig = {
     cleartext: true,
   },
   ios: {
-    contentInset: 'automatic',
+    contentInset: 'never',
   },
   plugins: {
     SplashScreen: {
@@ -18,10 +18,6 @@ const config: CapacitorConfig = {
       showSpinner: false,
       splashFullScreen: true,
       splashImmersive: true,
-    },
-    StatusBar: {
-      style: 'DARK',
-      backgroundColor: '#0b132b',
     },
   },
 };
