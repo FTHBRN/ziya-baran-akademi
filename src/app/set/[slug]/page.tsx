@@ -790,7 +790,7 @@ export default function SetStudyPage() {
 
                   <div className="text-center space-y-4 my-auto">
                     {currentCard.image_url && (
-                      <div className="w-24 h-24 sm:w-28 sm:h-28 mx-auto rounded-2xl overflow-hidden shadow-sm border border-slate-100">
+                      <div className="w-28 h-28 sm:w-36 sm:h-36 mx-auto rounded-2xl overflow-hidden shadow-sm border border-slate-100 bg-slate-50">
                         <img
                           src={currentCard.image_url}
                           alt="Visual"
@@ -842,6 +842,15 @@ export default function SetStudyPage() {
                   </div>
 
                   <div className="text-center space-y-3 my-auto px-4">
+                    {currentCard.image_url && (
+                      <div className="w-24 h-24 sm:w-32 sm:h-32 mx-auto rounded-2xl overflow-hidden shadow-sm border border-white/20 bg-white/10 mb-2">
+                        <img
+                          src={currentCard.image_url}
+                          alt="Visual"
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                    )}
                     <h2 className="text-xl sm:text-3xl font-semibold tracking-tight leading-relaxed">
                       {currentCard.turkish_text}
                     </h2>
@@ -929,7 +938,7 @@ export default function SetStudyPage() {
               {/* Question Text */}
               <div className="text-center py-4 space-y-3">
                 {currentQuizCard?.image_url && (
-                  <div className="w-20 h-20 mx-auto rounded-xl overflow-hidden shadow-sm border border-slate-100">
+                  <div className="w-24 h-24 sm:w-32 sm:h-32 mx-auto rounded-2xl overflow-hidden shadow-sm border border-slate-100 bg-slate-50 mb-2">
                     <img
                       src={currentQuizCard.image_url}
                       alt="Visual"
@@ -1076,11 +1085,11 @@ export default function SetStudyPage() {
 
           <div className="text-center py-2 space-y-2">
             {cards[writingIndex]?.image_url && (
-              <div className="max-h-28 sm:max-h-36 max-w-[220px] mx-auto rounded-2xl overflow-hidden shadow-xs border border-slate-100 flex items-center justify-center bg-slate-50 mb-2">
+              <div className="w-24 h-24 sm:w-32 sm:h-32 mx-auto rounded-2xl overflow-hidden shadow-sm border border-slate-100 bg-slate-50 mb-2">
                 <img
                   src={cards[writingIndex].image_url}
                   alt="Visual"
-                  className="max-h-28 sm:max-h-36 w-auto object-contain"
+                  className="w-full h-full object-cover"
                 />
               </div>
             )}
