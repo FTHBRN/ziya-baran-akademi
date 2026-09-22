@@ -1,6 +1,5 @@
 'use client';
 
-import { useEffect } from 'react';
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
 import OfflineState from '@/components/common/OfflineState';
@@ -8,18 +7,6 @@ import StudentAuthGate from '@/components/auth/StudentAuthGate';
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-
-  useEffect(() => {
-    async function hideSplash() {
-      try {
-        const { SplashScreen } = await import('@capacitor/splash-screen');
-        await SplashScreen.hide({ fadeOutDuration: 400 });
-      } catch (e) {
-        // Silently ignore in browser environments
-      }
-    }
-    hideSplash();
-  }, []);
 
   // Active study mode: When student is inside an interactive set, test, or story
   const isStudyMode =
