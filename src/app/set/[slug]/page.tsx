@@ -20,10 +20,14 @@ import {
   Play,
   Headphones,
   Sparkles,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 import { decodeSetDescription } from '@/lib/set-utils';
 import { decodeCardTurkish } from '@/lib/card-utils';
 import { triggerHaptic } from '@/lib/haptics';
+import { useCachedSet } from '@/lib/api-cache';
+import { SetSkeleton } from '@/components/common/Skeletons';
 
 const BADGE_COLORS = [
   'bg-rose-500 text-white',
@@ -38,17 +42,22 @@ const BADGE_COLORS = [
   'bg-orange-500 text-white',
 ];
 
-export default function SetStudyPage() {
-  const router = useRouter();
+export default function SetDetailPage() {
   const params = useParams();
+  const router = useRouter();
   const slug = params?.slug as string;
+
+  const { data: cached, isLoading } = useCachedSet(slug);
 
   const [setInfo, setSetInfo] = useState<any>(null);
   const [cards, setCards] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [mode, setMode] = useState<'flashcards' | 'quiz' | 'writing' | 'matching' | 'story'>('flashcards');
 
-  // Active study mode: 'story' | 'flashcards' | 'quiz' | 'writing'
-  const [mode, setMode] = useState<'story' | 'flashcards' | 'quiz' | 'writing'>('flashcards');
+  // Sibling sets for sequential folder flow
+  const [prevSet, setPrevSet] = useState<{ title: string; slug: string } | null>(null);
+  const [nextSet, setNextSet] = useState<{ title: string; slug: string } | null>(null);
+
+  // 1. Flashcard Mode State
   const [playingSentenceIdx, setPlayingSentenceIdx] = useState<number | null>(null);
 
   // Study Notes Modal
@@ -72,45 +81,31 @@ export default function SetStudyPage() {
   const [writingStatus, setWritingStatus] = useState<'idle' | 'correct' | 'wrong'>('idle');
   const [showAnswer, setShowAnswer] = useState(false);
 
+  const loading = isLoading && !cached?.setItem;
+
   useEffect(() => {
-    async function loadSet() {
-      if (!slug) return;
-      try {
-        setLoading(true);
-        const { data: setItem, error: setErr } = await supabase
-          .from('sets')
-          .select('*, folders(name, classes(name)), set_cards(*)')
-          .eq('slug', slug)
-          .single();
-
-        if (setErr) throw setErr;
-
-        if (setItem) {
-          setSetInfo(setItem);
-          const decodedDesc = decodeSetDescription(setItem.description);
-          if (decodedDesc.storyMeta?.isStory) {
-            setMode('story');
-          }
-          const sortedCards = (setItem.set_cards || [])
-            .sort((a: any, b: any) => (a.order_index || 0) - (b.order_index || 0))
-            .map((c: any) => {
-              const decoded = decodeCardTurkish(c.turkish_text);
-              return {
-                ...c,
-                turkish_text: decoded.turkish,
-                hint: decoded.hint,
-              };
-            });
-          setCards(sortedCards);
-        }
-      } catch (e) {
-        console.error('Set yükleme hatası:', e);
-      } finally {
-        setLoading(false);
+    if (cached?.setItem) {
+      const setItem = cached.setItem;
+      setSetInfo(setItem);
+      const decodedDesc = decodeSetDescription(setItem.description);
+      if (decodedDesc.storyMeta?.isStory) {
+        setMode('story');
       }
+      const sortedCards = (setItem.set_cards || [])
+        .sort((a: any, b: any) => (a.order_index || 0) - (b.order_index || 0))
+        .map((c: any) => {
+          const decoded = decodeCardTurkish(c.turkish_text);
+          return {
+            ...c,
+            turkish_text: decoded.turkish,
+            hint: decoded.hint,
+          };
+        });
+      setCards(sortedCards);
+      setPrevSet(cached.prevSet || null);
+      setNextSet(cached.nextSet || null);
     }
-    loadSet();
-  }, [slug]);
+  }, [cached]);
 
   // High-performance audio player with Microsoft Edge Jenny Neural + local fallback
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -439,12 +434,7 @@ export default function SetStudyPage() {
   };
 
   if (loading) {
-    return (
-      <div className="py-24 text-center space-y-3">
-        <div className="inline-block w-8 h-8 border-4 border-brand-600 border-t-transparent rounded-full animate-spin"></div>
-        <p className="text-sm text-slate-500 font-medium">Çalışma seti yükleniyor...</p>
-      </div>
-    );
+    return <SetSkeleton />;
   }
 
   if (!setInfo || cards.length === 0) {
@@ -515,6 +505,41 @@ export default function SetStudyPage() {
           style={{ width: `${Math.round(((cardIndex + 1) / cards.length) * 100)}%` }}
         />
       </div>
+
+      {/* Sequential Navigation Bar (Top) */}
+      {(prevSet || nextSet) && (
+        <div className="flex items-center justify-between gap-2 p-1.5 px-3 rounded-2xl bg-white border border-slate-200/80 shadow-2xs text-xs font-bold text-slate-700">
+          {prevSet ? (
+            <Link
+              href={`/set/${prevSet.slug}`}
+              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-slate-50 hover:bg-indigo-50 text-slate-700 hover:text-indigo-700 border border-slate-200/80 transition"
+              title="Önceki Sete Geç"
+            >
+              <ChevronLeft className="w-3.5 h-3.5 text-indigo-600" />
+              <span className="truncate max-w-[110px] sm:max-w-xs">{prevSet.title}</span>
+            </Link>
+          ) : (
+            <div />
+          )}
+
+          <span className="text-[11px] text-slate-400 font-semibold hidden sm:inline">
+            {setInfo?.folders?.name || 'Konu Akışı'}
+          </span>
+
+          {nextSet ? (
+            <Link
+              href={`/set/${nextSet.slug}`}
+              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-slate-50 hover:bg-indigo-50 text-slate-700 hover:text-indigo-700 border border-slate-200/80 transition ml-auto"
+              title="Sonraki Sete Geç"
+            >
+              <span className="truncate max-w-[110px] sm:max-w-xs">{nextSet.title}</span>
+              <ChevronRight className="w-3.5 h-3.5 text-indigo-600" />
+            </Link>
+          ) : (
+            <div />
+          )}
+        </div>
+      )}
 
       {/* Centered Konu Anlatımı Button (Prominent & Balanced) */}
       {studyNotes && (
@@ -1075,11 +1100,14 @@ export default function SetStudyPage() {
           ) : (
             /* Quiz Results Screen */
             <div className="text-center py-8 space-y-4">
-              <div className="w-16 h-16 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center mx-auto shadow-inner">
+              <div className="w-16 h-16 bg-amber-100 text-amber-600 rounded-3xl flex items-center justify-center mx-auto shadow-inner">
                 <Trophy className="w-8 h-8" />
               </div>
-              <h3 className="text-2xl font-bold text-slate-900 tracking-tight">
-                Tebrikler! Testi Tamamladınız!
+              <span className="inline-block px-3 py-1 rounded-full text-xs font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                {setInfo?.title}
+              </span>
+              <h3 className="text-2xl font-black text-slate-900 tracking-tight">
+                Tebrikler! "{setInfo?.title}" Testini Tamamladınız! 🎉
               </h3>
               <p className="text-base font-normal text-slate-600">
                 {cards.length} sorudan{' '}
@@ -1088,7 +1116,7 @@ export default function SetStudyPage() {
                 </span>{' '}
                 tanesini doğru bildiniz.
               </p>
-              <div className="pt-4 flex justify-center gap-3">
+              <div className="pt-4 flex flex-wrap justify-center gap-3">
                 <button
                   onClick={resetQuiz}
                   className="px-5 py-2.5 rounded-xl bg-brand-600 text-white font-semibold text-sm hover:bg-brand-700 shadow-md shadow-brand-500/20"
@@ -1101,6 +1129,15 @@ export default function SetStudyPage() {
                 >
                   Kartlara Dön
                 </button>
+                {nextSet && (
+                  <Link
+                    href={`/set/${nextSet.slug}`}
+                    className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm shadow-md shadow-emerald-600/20 flex items-center gap-2 transition"
+                  >
+                    <span>Sıradaki Set: {nextSet.title}</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </Link>
+                )}
               </div>
             </div>
           )}
@@ -1261,6 +1298,41 @@ export default function SetStudyPage() {
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Bottom Sequential Navigation Cards */}
+      {(prevSet || nextSet) && (
+        <div className="pt-6 border-t border-slate-200/80 flex items-stretch justify-between gap-3">
+          {prevSet ? (
+            <Link
+              href={`/set/${prevSet.slug}`}
+              className="flex-1 max-w-xs p-3.5 sm:p-4 rounded-2xl bg-white hover:bg-slate-50 border border-slate-200/90 shadow-2xs space-y-1 transition text-left group"
+            >
+              <span className="text-[11px] font-bold text-slate-400 flex items-center gap-1 group-hover:text-indigo-600 transition">
+                <ChevronLeft className="w-3.5 h-3.5" />
+                <span>Önceki Çalışma</span>
+              </span>
+              <p className="text-xs sm:text-sm font-bold text-slate-800 truncate">{prevSet.title}</p>
+            </Link>
+          ) : (
+            <div className="flex-1" />
+          )}
+
+          {nextSet ? (
+            <Link
+              href={`/set/${nextSet.slug}`}
+              className="flex-1 max-w-xs p-3.5 sm:p-4 rounded-2xl bg-white hover:bg-slate-50 border border-slate-200/90 shadow-2xs space-y-1 transition text-right group ml-auto"
+            >
+              <span className="text-[11px] font-bold text-slate-400 flex items-center justify-end gap-1 group-hover:text-indigo-600 transition">
+                <span>Sonraki Çalışma</span>
+                <ChevronRight className="w-3.5 h-3.5" />
+              </span>
+              <p className="text-xs sm:text-sm font-bold text-slate-800 truncate">{nextSet.title}</p>
+            </Link>
+          ) : (
+            <div className="flex-1" />
+          )}
         </div>
       )}
     </div>

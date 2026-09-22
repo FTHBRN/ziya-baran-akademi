@@ -7,9 +7,13 @@ import { supabase } from '@/lib/supabase';
 import { decodePageTexts } from '@/lib/story-utils';
 import confetti from 'canvas-confetti';
 import { triggerHaptic } from '@/lib/haptics';
+import { useCachedStory } from '@/lib/api-cache';
+import { StorySkeleton } from '@/components/common/Skeletons';
 import {
   ArrowLeft,
   ArrowRight,
+  ChevronLeft,
+  ChevronRight,
   Volume2,
   VolumeX,
   Eye,
@@ -45,10 +49,15 @@ export default function StoryReaderPage() {
   const router = useRouter();
   const slug = params?.slug as string;
 
+  const { data: cached, isLoading } = useCachedStory(slug);
+
   const [story, setStory] = useState<any>(null);
   const [pages, setPages] = useState<StoryPageData[]>([]);
   const [currentPageIndex, setCurrentPageIndex] = useState(0);
-  const [loading, setLoading] = useState(true);
+
+  // Sibling stories for sequential folder navigation
+  const [prevStory, setPrevStory] = useState<{ title: string; slug: string } | null>(null);
+  const [nextStory, setNextStory] = useState<{ title: string; slug: string } | null>(null);
 
   // Student Preferences & Interactivity
   const [theme, setTheme] = useState<'paper' | 'white' | 'dark'>('paper');
@@ -65,48 +74,32 @@ export default function StoryReaderPage() {
   const edgeAudioRef = useRef<HTMLAudioElement | null>(null);
   const [isAudioPlaying, setIsAudioPlaying] = useState(false);
 
+  const loading = isLoading && !cached?.storyData;
+
   useEffect(() => {
-    async function loadStory() {
-      if (!slug) return;
-      try {
-        setLoading(true);
-        const { data: storyData, error: storyError } = await supabase
-          .from('stories')
-          .select('*, folders(name, classes(name)), story_pages(*)')
-          .eq('slug', slug)
-          .single();
+    if (cached?.storyData) {
+      setStory(cached.storyData);
+      const rawPages = cached.storyData.story_pages || [];
+      const sorted = [...rawPages].sort((a: any, b: any) => (a.page_number || 0) - (b.page_number || 0));
 
-        if (storyError) throw storyError;
+      const formattedPages: StoryPageData[] = sorted.map((p: any) => {
+        const decoded = decodePageTexts(p.turkish_text);
+        return {
+          id: p.id,
+          page_number: p.page_number,
+          english_text: p.english_text || '',
+          turkish_text: decoded.turkish,
+          pronunciation: decoded.pronunciation || p.pronunciation || '',
+          image_url: p.image_url,
+          audio_url: p.audio_url,
+        };
+      });
 
-        if (storyData) {
-          setStory(storyData);
-          const rawPages = storyData.story_pages || [];
-          const sorted = [...rawPages].sort((a: any, b: any) => (a.page_number || 0) - (b.page_number || 0));
-
-          const formattedPages: StoryPageData[] = sorted.map((p: any) => {
-            const decoded = decodePageTexts(p.turkish_text);
-            return {
-              id: p.id,
-              page_number: p.page_number,
-              english_text: p.english_text || '',
-              turkish_text: decoded.turkish,
-              pronunciation: decoded.pronunciation || p.pronunciation || '',
-              image_url: p.image_url,
-              audio_url: p.audio_url,
-            };
-          });
-
-          setPages(formattedPages);
-        }
-      } catch (err) {
-        console.error('Hikaye yüklenirken hata:', err);
-      } finally {
-        setLoading(false);
-      }
+      setPages(formattedPages);
+      setPrevStory(cached.prevStory || null);
+      setNextStory(cached.nextStory || null);
     }
-
-    loadStory();
-  }, [slug]);
+  }, [cached]);
 
   // Cancel TTS and pause audio when page changes
   useEffect(() => {
@@ -265,12 +258,7 @@ export default function StoryReaderPage() {
   };
 
   if (loading) {
-    return (
-      <div className="py-24 text-center space-y-4">
-        <div className="inline-block w-10 h-10 border-4 border-brand-600 border-t-transparent rounded-full animate-spin"></div>
-        <p className="text-base text-slate-500 font-medium">Hikâye kitabı açılıyor...</p>
-      </div>
-    );
+    return <StorySkeleton />;
   }
 
   if (!story || pages.length === 0) {
@@ -410,6 +398,41 @@ export default function StoryReaderPage() {
         />
       </div>
 
+      {/* Sequential Navigation Bar (Top) */}
+      {(prevStory || nextStory) && (
+        <div className="flex items-center justify-between gap-2 p-1.5 px-3 rounded-2xl bg-white border border-slate-200/80 shadow-2xs text-xs font-bold text-slate-700">
+          {prevStory ? (
+            <Link
+              href={`/story/${prevStory.slug}`}
+              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-slate-50 hover:bg-purple-50 text-slate-700 hover:text-purple-700 border border-slate-200/80 transition"
+              title="Önceki Hikâyeye Geç"
+            >
+              <ChevronLeft className="w-3.5 h-3.5 text-purple-600" />
+              <span className="truncate max-w-[110px] sm:max-w-xs">{prevStory.title}</span>
+            </Link>
+          ) : (
+            <div />
+          )}
+
+          <span className="text-[11px] text-slate-400 font-semibold hidden sm:inline">
+            {story?.folders?.name || 'Hikâye Akışı'}
+          </span>
+
+          {nextStory ? (
+            <Link
+              href={`/story/${nextStory.slug}`}
+              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 transition"
+              title="Sonraki Hikâyeye Geç"
+            >
+              <span className="truncate max-w-[110px] sm:max-w-xs">{nextStory.title}</span>
+              <ChevronRight className="w-3.5 h-3.5 text-purple-600" />
+            </Link>
+          ) : (
+            <div />
+          )}
+        </div>
+      )}
+
       {/* Celebration Finished Screen */}
       {isFinished ? (
         <div className="bg-white border border-slate-200 rounded-3xl p-8 sm:p-12 text-center space-y-6 shadow-sm">
@@ -418,6 +441,9 @@ export default function StoryReaderPage() {
           </div>
 
           <div className="space-y-2">
+            <span className="inline-block px-3 py-1 rounded-full bg-purple-50 border border-purple-200 text-purple-700 text-xs font-bold uppercase tracking-wider">
+              {story.title}
+            </span>
             <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
               Tebrikler! Hikâyeyi Tamamladın! 🎉
             </h2>
@@ -425,6 +451,19 @@ export default function StoryReaderPage() {
               "{story.title}" hikâyesinin tüm sayfalarını başarıyla okudun. Düzenli okuma yaparak İngilizce kelime dağarcığını ve telaffuzunu daha da geliştirebilirsin.
             </p>
           </div>
+
+          {/* Sequential Next Story Button if available */}
+          {nextStory && (
+            <div className="pt-2">
+              <Link
+                href={`/story/${nextStory.slug}`}
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-bold text-sm shadow-md shadow-purple-500/20 transition-all active:scale-95"
+              >
+                <span>Sıradaki Hikâye: {nextStory.title}</span>
+                <ChevronRight className="w-4 h-4" />
+              </Link>
+            </div>
+          )}
 
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-4">
             <button
@@ -648,6 +687,41 @@ export default function StoryReaderPage() {
               <ArrowRight className="w-4 h-4" />
             </button>
           </div>
+        </div>
+      )}
+
+      {/* Bottom Sequential Navigation Cards */}
+      {(prevStory || nextStory) && (
+        <div className="pt-6 border-t border-slate-200/80 flex items-stretch justify-between gap-3">
+          {prevStory ? (
+            <Link
+              href={`/story/${prevStory.slug}`}
+              className="flex-1 max-w-xs p-3.5 sm:p-4 rounded-2xl bg-white hover:bg-slate-50 border border-slate-200/90 shadow-2xs space-y-1 transition text-left group"
+            >
+              <span className="text-[11px] font-bold text-slate-400 flex items-center gap-1 group-hover:text-purple-600 transition">
+                <ChevronLeft className="w-3.5 h-3.5" />
+                <span>Önceki Hikâye</span>
+              </span>
+              <p className="text-xs sm:text-sm font-bold text-slate-800 truncate">{prevStory.title}</p>
+            </Link>
+          ) : (
+            <div className="flex-1" />
+          )}
+
+          {nextStory ? (
+            <Link
+              href={`/story/${nextStory.slug}`}
+              className="flex-1 max-w-xs p-3.5 sm:p-4 rounded-2xl bg-white hover:bg-slate-50 border border-slate-200/90 shadow-2xs space-y-1 transition text-right group ml-auto"
+            >
+              <span className="text-[11px] font-bold text-slate-400 flex items-center justify-end gap-1 group-hover:text-purple-600 transition">
+                <span>Sonraki Hikâye</span>
+                <ChevronRight className="w-3.5 h-3.5" />
+              </span>
+              <p className="text-xs sm:text-sm font-bold text-slate-800 truncate">{nextStory.title}</p>
+            </Link>
+          ) : (
+            <div className="flex-1" />
+          )}
         </div>
       )}
     </div>

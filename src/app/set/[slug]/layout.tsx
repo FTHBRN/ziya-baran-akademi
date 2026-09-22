@@ -9,57 +9,56 @@ export async function generateMetadata({
 }: {
   params: { slug: string };
 }): Promise<Metadata> {
-  const defaultMeta: Metadata = {
-    title: 'Ziya Baran Akademi | Çalışma Seti',
-    description: 'Ziya Baran Akademi interaktif İngilizce kelime seti ve alıştırmaları.',
-  };
+  const defaultImage = 'https://ziya-baran-akademi.vercel.app/logo-icon.png';
+  const defaultTitle = 'Çalışma Seti | Ziya Baran Akademi';
+  const defaultDesc = 'Ziya Baran Akademi interaktif İngilizce kelime seti ve alıştırmaları.';
 
   try {
     const { data: setItem } = await supabaseAdmin
       .from('sets')
-      .select('*, folders(name, classes(name)), set_cards(image_url, order_index)')
+      .select('title, description, set_cards(image_url, order_index)')
       .eq('slug', params.slug)
-      .maybeSingle();
+      .single();
 
     if (!setItem) {
-      return defaultMeta;
+      return {
+        title: defaultTitle,
+        description: defaultDesc,
+      };
     }
 
-    const { description, coverImageUrl } = decodeSetDescription(setItem.description);
-
-    // Pick best image: Set cover image > First card image with URL > Fallback Logo
-    const sortedCards = (setItem.set_cards || []).sort(
-      (a: any, b: any) => (a.order_index || 0) - (b.order_index || 0)
-    );
-    const firstCardImage = sortedCards.find((c: any) => c.image_url)?.image_url;
-
-    let imageUrl = coverImageUrl || firstCardImage || 'https://ziya-baran-akademi.vercel.app/logo.png';
-    if (imageUrl.startsWith('/')) {
-      imageUrl = `https://ziya-baran-akademi.vercel.app${imageUrl}`;
-    }
-
+    const decoded = decodeSetDescription(setItem.description);
     const title = `${setItem.title} | Ziya Baran Akademi`;
-    const folderInfo = setItem.folders?.classes?.name
-      ? `${setItem.folders.classes.name} - ${setItem.folders.name}`
-      : setItem.folders?.name || 'İngilizce Alıştırması';
+    const cleanDesc =
+      decoded.storyMeta?.subtitle ||
+      decoded.description ||
+      `${setItem.set_cards?.length || 0} kelimelik interaktif çalışma seti.`;
 
-    const desc =
-      description ||
-      `${folderInfo} için "${setItem.title}" interaktif flaş kartlar, testler ve yazma alıştırmaları.`;
-
-    const pageUrl = `https://ziya-baran-akademi.vercel.app/set/${setItem.slug}`;
+    // Image hierarchy:
+    // 1. Dedicated cover image
+    // 2. First card image
+    // 3. Fallback site logo
+    let chosenImage = decoded.coverImageUrl?.trim();
+    if (!chosenImage && setItem.set_cards && setItem.set_cards.length > 0) {
+      const sorted = [...setItem.set_cards].sort(
+        (a: any, b: any) => (a.order_index || 0) - (b.order_index || 0)
+      );
+      const firstWithImg = sorted.find((c: any) => c.image_url?.trim());
+      if (firstWithImg) chosenImage = firstWithImg.image_url.trim();
+    }
+    const finalImage = chosenImage || defaultImage;
 
     return {
       title,
-      description: desc,
+      description: cleanDesc,
       openGraph: {
-        title: `${setItem.title} - Ziya Baran Akademi`,
-        description: desc,
-        url: pageUrl,
+        title: setItem.title,
+        description: cleanDesc,
+        url: `https://ziya-baran-akademi.vercel.app/set/${params.slug}`,
         siteName: 'Ziya Baran Akademi',
         images: [
           {
-            url: imageUrl,
+            url: finalImage,
             width: 1200,
             height: 630,
             alt: setItem.title,
@@ -70,14 +69,16 @@ export async function generateMetadata({
       },
       twitter: {
         card: 'summary_large_image',
-        title,
-        description: desc,
-        images: [imageUrl],
+        title: setItem.title,
+        description: cleanDesc,
+        images: [finalImage],
       },
     };
-  } catch (err) {
-    console.error('generateMetadata error for set:', err);
-    return defaultMeta;
+  } catch {
+    return {
+      title: defaultTitle,
+      description: defaultDesc,
+    };
   }
 }
 

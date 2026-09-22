@@ -8,6 +8,8 @@ import confetti from 'canvas-confetti';
 import {
   ArrowLeft,
   ArrowRight,
+  ChevronLeft,
+  ChevronRight,
   CheckCircle2,
   XCircle,
   Trophy,
@@ -17,6 +19,8 @@ import {
   Home,
 } from 'lucide-react';
 import { triggerHaptic } from '@/lib/haptics';
+import { useCachedTest } from '@/lib/api-cache';
+import { TestSkeleton } from '@/components/common/Skeletons';
 
 interface Question {
   id: string;
@@ -37,9 +41,28 @@ export default function StudentTestPage() {
   const params = useParams();
   const slug = params?.slug as string;
 
+  const { data: cached, isLoading } = useCachedTest(slug);
+
   const [testInfo, setTestInfo] = useState<any>(null);
   const [questions, setQuestions] = useState<Question[]>([]);
-  const [loading, setLoading] = useState(true);
+
+  // Sibling tests for sequential folder navigation
+  const [prevTest, setPrevTest] = useState<{ title: string; slug: string } | null>(null);
+  const [nextTest, setNextTest] = useState<{ title: string; slug: string } | null>(null);
+
+  const loading = isLoading && !cached?.testItem;
+
+  useEffect(() => {
+    if (cached?.testItem) {
+      setTestInfo(cached.testItem);
+      const sorted = (cached.testItem.test_questions || []).sort(
+        (a: any, b: any) => (a.order_index || 0) - (b.order_index || 0)
+      );
+      setQuestions(sorted);
+      setPrevTest(cached.prevTest || null);
+      setNextTest(cached.nextTest || null);
+    }
+  }, [cached]);
 
   // Test Runner State
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -50,35 +73,6 @@ export default function StudentTestPage() {
   const [userAnswers, setUserAnswers] = useState<
     { questionIndex: number; selected: string; isCorrect: boolean }[]
   >([]);
-
-  useEffect(() => {
-    async function loadTest() {
-      if (!slug) return;
-      try {
-        setLoading(true);
-        const { data: testItem, error: testErr } = await supabase
-          .from('manual_tests')
-          .select('*, folders(name, classes(name)), test_questions(*)')
-          .eq('slug', slug)
-          .single();
-
-        if (testErr) throw testErr;
-
-        if (testItem) {
-          setTestInfo(testItem);
-          const sorted = (testItem.test_questions || []).sort(
-            (a: any, b: any) => (a.order_index || 0) - (b.order_index || 0)
-          );
-          setQuestions(sorted);
-        }
-      } catch (e) {
-        console.error('Test yükleme hatası:', e);
-      } finally {
-        setLoading(false);
-      }
-    }
-    loadTest();
-  }, [slug]);
 
   const currentQ = questions[currentIndex];
 
@@ -129,12 +123,7 @@ export default function StudentTestPage() {
   };
 
   if (loading) {
-    return (
-      <div className="py-24 text-center space-y-3">
-        <div className="inline-block w-8 h-8 border-4 border-brand-600 border-t-transparent rounded-full animate-spin"></div>
-        <p className="text-sm text-slate-500 font-medium">Test yükleniyor...</p>
-      </div>
-    );
+    return <TestSkeleton />;
   }
 
   if (!testInfo || questions.length === 0) {
@@ -217,6 +206,41 @@ export default function StudentTestPage() {
         />
       </div>
 
+      {/* Sequential Navigation Bar (Top) */}
+      {(prevTest || nextTest) && (
+        <div className="flex items-center justify-between gap-2 p-1.5 px-3 rounded-2xl bg-white border border-slate-200/80 shadow-2xs text-xs font-bold text-slate-700">
+          {prevTest ? (
+            <Link
+              href={`/test/${prevTest.slug}`}
+              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-slate-50 hover:bg-indigo-50 text-slate-700 hover:text-indigo-700 border border-slate-200/80 transition"
+              title="Önceki Teste Geç"
+            >
+              <ChevronLeft className="w-3.5 h-3.5 text-indigo-600" />
+              <span className="truncate max-w-[110px] sm:max-w-xs">{prevTest.title}</span>
+            </Link>
+          ) : (
+            <div />
+          )}
+
+          <span className="text-[11px] text-slate-400 font-semibold hidden sm:inline">
+            {testInfo?.folders?.name || 'Test Akışı'}
+          </span>
+
+          {nextTest ? (
+            <Link
+              href={`/test/${nextTest.slug}`}
+              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 transition"
+              title="Sonraki Teste Geç"
+            >
+              <span className="truncate max-w-[110px] sm:max-w-xs">{nextTest.title}</span>
+              <ChevronRight className="w-3.5 h-3.5 text-indigo-600" />
+            </Link>
+          ) : (
+            <div />
+          )}
+        </div>
+      )}
+
       {!isFinished ? (
         /* ========================================================= */
         /* QUESTION RUNNER                                           */
@@ -228,24 +252,32 @@ export default function StudentTestPage() {
             <div className="w-full max-h-64 sm:max-h-80 rounded-2xl overflow-hidden shadow-xs border border-slate-100 bg-slate-50 flex items-center justify-center p-2">
               <img
                 src={currentQ.image_url}
-                alt={`Soru ${currentIndex + 1} görseli`}
-                className="max-h-60 sm:max-h-76 w-auto object-contain rounded-xl"
+                alt="Soru Görseli"
+                className="max-h-60 sm:max-h-76 object-contain rounded-xl"
               />
             </div>
           )}
 
-          {/* Question Text */}
-          <div className="py-2">
-            <h2 className="text-lg sm:text-xl font-bold text-slate-900 tracking-tight leading-relaxed">
+          {/* Question Title & Text */}
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <span className="px-2.5 py-1 rounded-lg bg-indigo-50 text-indigo-700 font-bold text-xs uppercase tracking-wider">
+                Soru {currentIndex + 1}
+              </span>
+              <span className="text-xs text-slate-400">
+                / {questions.length} Soru
+              </span>
+            </div>
+            <h2 className="text-lg sm:text-xl font-bold text-slate-900 leading-snug">
               {currentQ.question_text}
             </h2>
           </div>
 
-          {/* 4 Choices */}
-          <div className="grid grid-cols-1 gap-3">
+          {/* Options Grid (2x2 on desktop, 1-col on mobile) */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
             {optionsList.map(({ letter, text }) => {
               const isSelected = selectedOption === letter;
-              const isCorrect = letter === correctOptionLetter;
+              const isCorrect = letter.toUpperCase() === correctOptionLetter;
 
               let btnStyle =
                 'bg-slate-50/70 hover:bg-slate-100/90 border-slate-200/90 text-slate-800';
@@ -328,6 +360,9 @@ export default function StudentTestPage() {
           </div>
 
           <div className="space-y-2">
+            <span className="inline-block px-3 py-1 rounded-full bg-brand-50 border border-brand-200 text-brand-700 text-xs font-bold uppercase tracking-wider">
+              {testInfo?.title || 'Test Tamamlandı'}
+            </span>
             <h2 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
               Tebrikler! Testi Tamamladınız!
             </h2>
@@ -359,6 +394,19 @@ export default function StudentTestPage() {
               : '💪 Biraz daha pratik yaparak çok daha iyi sonuçlar elde edebilirsiniz. Tekrar çözmek ister misiniz?'}
           </p>
 
+          {/* Sequential Next Test Button if available */}
+          {nextTest && (
+            <div className="pt-2">
+              <Link
+                href={`/test/${nextTest.slug}`}
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl bg-gradient-to-r from-indigo-600 to-brand-600 hover:from-indigo-700 hover:to-brand-700 text-white font-bold text-sm shadow-md shadow-brand-500/20 transition-all active:scale-95"
+              >
+                <span>Sıradaki Test: {nextTest.title}</span>
+                <ChevronRight className="w-4 h-4" />
+              </Link>
+            </div>
+          )}
+
           <div className="pt-4 flex flex-col sm:flex-row items-center justify-center gap-3">
             <button
               onClick={handleResetTest}
@@ -374,6 +422,41 @@ export default function StudentTestPage() {
               Derslere Dön
             </Link>
           </div>
+        </div>
+      )}
+
+      {/* Bottom Sequential Navigation Cards */}
+      {(prevTest || nextTest) && (
+        <div className="pt-6 border-t border-slate-200/80 flex items-stretch justify-between gap-3">
+          {prevTest ? (
+            <Link
+              href={`/test/${prevTest.slug}`}
+              className="flex-1 max-w-xs p-3.5 sm:p-4 rounded-2xl bg-white hover:bg-slate-50 border border-slate-200/90 shadow-2xs space-y-1 transition text-left group"
+            >
+              <span className="text-[11px] font-bold text-slate-400 flex items-center gap-1 group-hover:text-indigo-600 transition">
+                <ChevronLeft className="w-3.5 h-3.5" />
+                <span>Önceki Test</span>
+              </span>
+              <p className="text-xs sm:text-sm font-bold text-slate-800 truncate">{prevTest.title}</p>
+            </Link>
+          ) : (
+            <div className="flex-1" />
+          )}
+
+          {nextTest ? (
+            <Link
+              href={`/test/${nextTest.slug}`}
+              className="flex-1 max-w-xs p-3.5 sm:p-4 rounded-2xl bg-white hover:bg-slate-50 border border-slate-200/90 shadow-2xs space-y-1 transition text-right group ml-auto"
+            >
+              <span className="text-[11px] font-bold text-slate-400 flex items-center justify-end gap-1 group-hover:text-indigo-600 transition">
+                <span>Sonraki Test</span>
+                <ChevronRight className="w-3.5 h-3.5" />
+              </span>
+              <p className="text-xs sm:text-sm font-bold text-slate-800 truncate">{nextTest.title}</p>
+            </Link>
+          ) : (
+            <div className="flex-1" />
+          )}
         </div>
       )}
     </div>

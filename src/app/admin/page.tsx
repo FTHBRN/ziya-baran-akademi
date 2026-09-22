@@ -32,10 +32,17 @@ import {
   Palette,
   Loader2,
   Wand2,
+  KeyRound,
+  LogOut,
+  Share2,
 } from 'lucide-react';
 import { decodePageTexts } from '@/lib/story-utils';
 import { encodeSetDescription, decodeSetDescription } from '@/lib/set-utils';
 import AdminTestManager from '@/components/admin/AdminTestManager';
+import AdminSettingsManager from '@/components/admin/AdminSettingsManager';
+import AdminLoginGate from '@/components/admin/AdminLoginGate';
+import ShareModal, { ShareItem } from '@/components/admin/ShareModal';
+import AdminLibraryView from '@/components/admin/AdminLibraryView';
 import { decodeCardTurkish } from '@/lib/card-utils';
 import { decodeModuleMetadata, encodeModuleMetadata, MODULE_THEMES, ModuleTheme } from '@/lib/module-utils';
 
@@ -55,7 +62,10 @@ interface StoryPageInput {
 }
 
 export default function AdminPage() {
-  const [activeTab, setActiveTab] = useState<'create-set' | 'story-set' | 'manage-classes' | 'all-sets' | 'stories' | 'tests'>('create-set');
+  const [activeTab, setActiveTab] = useState<'library' | 'create-set' | 'story-set' | 'manage-classes' | 'all-sets' | 'stories' | 'tests' | 'settings'>('library');
+  const [shareItem, setShareItem] = useState<ShareItem | null>(null);
+  const [showCreateDropdown, setShowCreateDropdown] = useState(false);
+  const [isNotesExpanded, setIsNotesExpanded] = useState(false);
   const [classes, setClasses] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -109,6 +119,7 @@ export default function AdminPage() {
 
   // Edit Mode state
   const [editingSetId, setEditingSetId] = useState<string | null>(null);
+  const [editingStoryMeta, setEditingStoryMeta] = useState<any>(null);
 
   // Set Creation / Edit Form states
   const [setTitle, setSetTitle] = useState('');
@@ -150,6 +161,7 @@ export default function AdminPage() {
   const [aiGeneratingStoryRowIndex, setAiGeneratingStoryRowIndex] = useState<number | null>(null);
   const [aiGeneratingCover, setAiGeneratingCover] = useState(false);
   const [aiGeneratingStoryCover, setAiGeneratingStoryCover] = useState(false);
+  const [aiQuality, setAiQuality] = useState<'fast' | 'hd'>('fast');
   
   // Batch AI Generation Modal/Progress state
   const [aiBatchProgress, setAiBatchProgress] = useState<{
@@ -197,8 +209,32 @@ export default function AdminPage() {
   const [editModuleIcon, setEditModuleIcon] = useState('📖');
   const [isSavingModule, setIsSavingModule] = useState(false);
 
+  const [isAdminAuthed, setIsAdminAuthed] = useState<boolean | null>(null);
+
   useEffect(() => {
-    loadHierarchy();
+    const savedToken = localStorage.getItem('zb_admin_token');
+    if (!savedToken) {
+      setIsAdminAuthed(false);
+      return;
+    }
+
+    fetch('/api/admin/auth', {
+      headers: { Authorization: `Bearer ${savedToken}` },
+    })
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.valid) {
+          setIsAdminAuthed(true);
+          loadHierarchy();
+        } else {
+          localStorage.removeItem('zb_admin_token');
+          setIsAdminAuthed(false);
+        }
+      })
+      .catch(() => {
+        setIsAdminAuthed(true);
+        loadHierarchy();
+      });
   }, []);
 
   const showToast = (text: string, type: 'success' | 'error' = 'success') => {
@@ -212,6 +248,7 @@ export default function AdminPage() {
       const { data, error } = await supabase
         .from('classes')
         .select('*, folders(*, sets(*, set_cards(*)))')
+        .neq('slug', '__system_settings__')
         .order('order_index');
 
       if (error) throw error;
@@ -455,7 +492,9 @@ export default function AdminPage() {
 
     setIsSubmitting(true);
     try {
-      const encodedDescription = encodeSetDescription(setDescription, setCoverUrl, studyNotes);
+      const isStoryTitle = /^this is my story/i.test(setTitle.trim());
+      const finalStoryMeta = editingStoryMeta || (isStoryTitle ? { isStory: true, subtitle: setDescription.trim() } : undefined);
+      const encodedDescription = encodeSetDescription(setDescription, setCoverUrl, studyNotes, finalStoryMeta);
 
       if (editingSetId) {
         const res = await fetch('/api/admin/update-set', {
@@ -473,6 +512,7 @@ export default function AdminPage() {
         if (data.success) {
           showToast('Set başarıyla güncellendi!');
           setEditingSetId(null);
+          setEditingStoryMeta(null);
           setCreatedSetUrl(`/set/${data.set.slug}`);
           loadHierarchy();
         } else {
@@ -519,13 +559,16 @@ export default function AdminPage() {
     setEditingSetId(setObj.id);
     setSetTitle(setObj.title || '');
     
-    const { description: cleanDesc, coverImageUrl, studyNotes: notes } = decodeSetDescription(setObj.description);
+    const { description: cleanDesc, coverImageUrl, studyNotes: notes, storyMeta } = decodeSetDescription(setObj.description);
     setSetDescription(cleanDesc);
     setSetCoverUrl(coverImageUrl);
     setStudyNotes(notes || '');
     if (notesEditorRef.current) {
       notesEditorRef.current.innerHTML = notes || '';
     }
+
+    const isStoryTitle = /^this is my story/i.test(setObj.title || '');
+    setEditingStoryMeta(storyMeta || (isStoryTitle ? { isStory: true, subtitle: cleanDesc } : null));
 
     if (classObj) setSelectedClassId(classObj.id);
     if (folderObj) setSelectedFolderId(folderObj.id);
@@ -549,6 +592,7 @@ export default function AdminPage() {
     }
 
     setCreatedSetUrl(null);
+    setIsNotesExpanded(!!notes?.trim());
     setActiveTab('create-set');
     window.scrollTo({ top: 0, behavior: 'smooth' });
     showToast(`"${setObj.title}" seti düzenleme masasına alındı.`);
@@ -556,10 +600,12 @@ export default function AdminPage() {
 
   const handleCancelEdit = () => {
     setEditingSetId(null);
+    setEditingStoryMeta(null);
     setSetTitle('');
     setSetDescription('');
     setSetCoverUrl('');
     setStudyNotes('');
+    setIsNotesExpanded(false);
     if (notesEditorRef.current) {
       notesEditorRef.current.innerHTML = '';
     }
@@ -590,6 +636,7 @@ export default function AdminPage() {
           action: 'single',
           text: card.english_text.trim(),
           turkishText: card.turkish_text.trim(),
+          quality: aiQuality,
         }),
       });
 
@@ -604,7 +651,9 @@ export default function AdminPage() {
         setSetCoverUrl(data.imageUrl);
       }
 
-      showToast('Görsel başarıyla çizildi ve karta eklendi!');
+      showToast(
+        `Görsel başarıyla çizildi! (${aiQuality === 'hd' ? '🌟 Sinematik HD' : '⚡ Standart'})`
+      );
     } catch (err: any) {
       console.error(err);
       showToast('AI Görsel Hatası: ' + err.message, 'error');
@@ -628,6 +677,7 @@ export default function AdminPage() {
         body: JSON.stringify({
           action: 'single',
           text: setTitle.trim(),
+          quality: aiQuality,
         }),
       });
 
@@ -637,7 +687,7 @@ export default function AdminPage() {
       }
 
       setSetCoverUrl(data.imageUrl);
-      showToast('Kapak görseli başarıyla çizildi!');
+      showToast(`Kapak görseli başarıyla çizildi! (${aiQuality === 'hd' ? '🌟 Sinematik HD' : '⚡ Standart'})`);
     } catch (err: any) {
       console.error(err);
       showToast('Kapak Görsel Hatası: ' + err.message, 'error');
@@ -690,6 +740,7 @@ export default function AdminPage() {
             action: 'single',
             text: card.english_text.trim(),
             turkishText: card.turkish_text.trim(),
+            quality: aiQuality,
           }),
         });
 
@@ -710,12 +761,14 @@ export default function AdminPage() {
       }
 
       if (i < validCardIndexes.length - 1) {
-        await new Promise((r) => setTimeout(r, 1200));
+        await new Promise((r) => setTimeout(r, 400));
       }
     }
 
     setAiBatchProgress(null);
-    showToast(`${successCount} / ${validCardIndexes.length} kartın görseli başarıyla çizildi!`);
+    showToast(
+      `${successCount} / ${validCardIndexes.length} kart çizildi! (${aiQuality === 'hd' ? '🌟 Sinematik HD' : '⚡ Standart'})`
+    );
   };
 
   // Single Story Row AI Image Generation
@@ -735,6 +788,7 @@ export default function AdminPage() {
           action: 'single',
           text: row.english_text.trim(),
           turkishText: row.turkish_text.trim(),
+          quality: aiQuality,
         }),
       });
 
@@ -749,7 +803,7 @@ export default function AdminPage() {
         setStorySetCoverUrl(data.imageUrl);
       }
 
-      showToast('Cümle görseli başarıyla çizildi!');
+      showToast(`Cümle görseli çizildi! (${aiQuality === 'hd' ? '🌟 Sinematik HD' : '⚡ Standart'})`);
     } catch (err: any) {
       console.error(err);
       showToast('AI Görsel Hatası: ' + err.message, 'error');
@@ -773,6 +827,7 @@ export default function AdminPage() {
         body: JSON.stringify({
           action: 'single',
           text: storySetTitle.trim(),
+          quality: aiQuality,
         }),
       });
 
@@ -782,7 +837,7 @@ export default function AdminPage() {
       }
 
       setStorySetCoverUrl(data.imageUrl);
-      showToast('Story kapağı başarıyla çizildi!');
+      showToast(`Story kapağı çizildi! (${aiQuality === 'hd' ? '🌟 Sinematik HD' : '⚡ Standart'})`);
     } catch (err: any) {
       console.error(err);
       showToast('Kapak Hatası: ' + err.message, 'error');
@@ -835,6 +890,7 @@ export default function AdminPage() {
             action: 'single',
             text: row.english_text.trim(),
             turkishText: row.turkish_text.trim(),
+            quality: aiQuality,
           }),
         });
 
@@ -855,12 +911,14 @@ export default function AdminPage() {
       }
 
       if (i < validIndexes.length - 1) {
-        await new Promise((r) => setTimeout(r, 1200));
+        await new Promise((r) => setTimeout(r, 400));
       }
     }
 
     setAiBatchProgress(null);
-    showToast(`${successCount} / ${validIndexes.length} cümlenin görseli başarıyla çizildi!`);
+    showToast(
+      `${successCount} / ${validIndexes.length} cümle çizildi! (${aiQuality === 'hd' ? '🌟 Sinematik HD' : '⚡ Standart'})`
+    );
   };
 
   // Open Set AI Modal from "Tüm Setler"
@@ -890,6 +948,7 @@ export default function AdminPage() {
           action: 'set',
           setId: aiSetModal.set.id,
           onlyMissing: aiSetModal.onlyMissing,
+          quality: aiQuality,
         }),
       });
 
@@ -1485,8 +1544,34 @@ export default function AdminPage() {
     setCreatedStoryUrl(null);
   };
 
+  if (isAdminAuthed === null) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center text-indigo-400">
+        <Loader2 className="w-8 h-8 animate-spin" />
+      </div>
+    );
+  }
+
+  if (isAdminAuthed === false) {
+    return (
+      <AdminLoginGate
+        onSuccess={() => {
+          setIsAdminAuthed(true);
+          loadHierarchy();
+        }}
+      />
+    );
+  }
+
   return (
-    <div className="max-w-4xl mx-auto space-y-8 pb-16">
+    <div className="max-w-4xl mx-auto space-y-7 pb-16">
+      {/* Universal Share Modal */}
+      <ShareModal
+        item={shareItem}
+        onClose={() => setShareItem(null)}
+        showToast={showToast}
+      />
+
       {/* Toast Alert */}
       {toastMessage && (
         <div
@@ -1505,111 +1590,232 @@ export default function AdminPage() {
         </div>
       )}
 
-      {/* Top Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-200">
+      {/* Top Header & Quizlet Style Action Bar */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-200">
         <div>
-          <span className="text-xs font-semibold text-brand-600 uppercase tracking-wider">
-            YÖNETİM MASASI
-          </span>
-          <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 mt-0.5 tracking-tight">
-            Ziya Baran Akademi
-          </h1>
+          <button
+            type="button"
+            onClick={() => {
+              setActiveTab('library');
+              handleCancelEdit();
+            }}
+            className="text-left group cursor-pointer"
+          >
+            <span className="text-[11px] font-bold text-indigo-600 uppercase tracking-wider block">
+              YÖNETİM MASASI
+            </span>
+            <h1 className="text-2xl sm:text-3xl font-black text-slate-900 mt-0.5 tracking-tight group-hover:text-indigo-600 transition">
+              Ziya Baran Akademi
+            </h1>
+          </button>
         </div>
-        <Link
-          href="/"
-          className="text-xs font-semibold text-slate-700 hover:text-brand-600 bg-white border border-slate-200 px-3.5 py-2 rounded-xl shadow-sm w-fit flex items-center gap-1.5"
-        >
-          <span>Öğrenci Sayfasını Aç</span>
-          <ExternalLink className="w-3.5 h-3.5" />
-        </Link>
+
+        <div className="flex items-center gap-2.5 flex-wrap">
+          {/* Quizlet-Style "+ İçerik Oluştur" Dropdown */}
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setShowCreateDropdown(!showCreateDropdown)}
+              className="px-4 py-2.5 rounded-2xl bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-700 hover:to-indigo-800 text-white font-extrabold text-xs sm:text-sm shadow-md shadow-indigo-600/20 active:scale-98 transition flex items-center gap-2 cursor-pointer"
+            >
+              <Plus className="w-4 h-4 stroke-[3]" />
+              <span>İçerik Oluştur</span>
+              <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${showCreateDropdown ? 'rotate-180' : ''}`} />
+            </button>
+
+            {/* Dropdown Menu */}
+            {showCreateDropdown && (
+              <>
+                <div
+                  className="fixed inset-0 z-40"
+                  onClick={() => setShowCreateDropdown(false)}
+                />
+                <div className="absolute right-0 top-full mt-2 w-64 bg-white rounded-2xl shadow-2xl border border-slate-100 p-2 z-50 animate-in fade-in zoom-in-95 duration-150 space-y-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      handleCancelEdit();
+                      setActiveTab('create-set');
+                      setShowCreateDropdown(false);
+                    }}
+                    className="w-full p-2.5 rounded-xl hover:bg-emerald-50 text-left transition flex items-center gap-3 cursor-pointer group"
+                  >
+                    <div className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold text-base group-hover:scale-105 transition">
+                      🗂️
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold text-slate-900">Kelime / Çalışma Seti</p>
+                      <p className="text-[11px] text-slate-500">Flashcard kelime ezber seti</p>
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      handleCancelEdit();
+                      setActiveTab('story-set');
+                      setShowCreateDropdown(false);
+                    }}
+                    className="w-full p-2.5 rounded-xl hover:bg-amber-50 text-left transition flex items-center gap-3 cursor-pointer group"
+                  >
+                    <div className="w-8 h-8 rounded-lg bg-amber-100 text-amber-700 flex items-center justify-center font-bold text-base group-hover:scale-105 transition">
+                      ✨
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold text-slate-900">Story Set (10 Cümle)</p>
+                      <p className="text-[11px] text-slate-500">Görsel ve sesli hikaye seti</p>
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActiveTab('manage-classes');
+                      setShowCreateDropdown(false);
+                    }}
+                    className="w-full p-2.5 rounded-xl hover:bg-indigo-50 text-left transition flex items-center gap-3 cursor-pointer group"
+                  >
+                    <div className="w-8 h-8 rounded-lg bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold text-base group-hover:scale-105 transition">
+                      📁
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold text-slate-900">Yeni Modül veya Klasör</p>
+                      <p className="text-[11px] text-slate-500">Ders başlığı ve konu aç</p>
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActiveTab('tests');
+                      setShowCreateDropdown(false);
+                    }}
+                    className="w-full p-2.5 rounded-xl hover:bg-blue-50 text-left transition flex items-center gap-3 cursor-pointer group"
+                  >
+                    <div className="w-8 h-8 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-base group-hover:scale-105 transition">
+                      📝
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold text-slate-900">Yeni Test / Quiz</p>
+                      <p className="text-[11px] text-slate-500">4 şıklı çoktan seçmeli sınav</p>
+                    </div>
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* Student Page Link */}
+          <Link
+            href="/"
+            target="_blank"
+            className="text-xs font-bold text-slate-700 hover:text-indigo-600 bg-white hover:bg-slate-50 border border-slate-200 px-3.5 py-2.5 rounded-2xl shadow-2xs flex items-center gap-1.5 transition"
+          >
+            <span>Öğrenci Sayfası</span>
+            <ExternalLink className="w-3.5 h-3.5 text-slate-400" />
+          </Link>
+
+          {/* Logout Button */}
+          <button
+            type="button"
+            onClick={() => {
+              localStorage.removeItem('zb_admin_token');
+              setIsAdminAuthed(false);
+            }}
+            className="text-xs font-bold text-rose-600 hover:text-rose-700 hover:bg-rose-50 bg-white border border-rose-200 px-3 py-2.5 rounded-2xl shadow-2xs flex items-center gap-1.5 transition cursor-pointer"
+            title="Yönetici Oturumunu Kapat"
+          >
+            <LogOut className="w-3.5 h-3.5" />
+            <span>Çıkış Yap</span>
+          </button>
+        </div>
       </div>
 
-      {/* Main Tab Switcher */}
-      <div className="flex gap-2 p-1.5 bg-slate-200/80 rounded-2xl">
-        <button
-          onClick={() => setActiveTab('create-set')}
-          className={`flex-1 py-2.5 px-4 rounded-xl text-xs sm:text-sm font-semibold transition-all flex items-center justify-center gap-2 ${
-            activeTab === 'create-set'
-              ? 'bg-white text-brand-700 shadow-sm'
-              : 'text-slate-600 hover:text-slate-900 font-medium'
-          }`}
-        >
-          {editingSetId ? (
-            <>
-              <Edit3 className="w-4 h-4 text-amber-500" />
-              <span>Seti Düzenle</span>
-            </>
-          ) : (
-            <>
-              <Plus className="w-4 h-4 text-brand-600" />
-              <span>Yeni Set Oluştur</span>
-            </>
-          )}
-        </button>
+      {/* Breadcrumb / Return to Library Bar (when in sub-views) */}
+      {activeTab !== 'library' && (
+        <div className="flex items-center justify-between p-3.5 rounded-2xl bg-indigo-50/90 border border-indigo-200/80 animate-in fade-in duration-200">
+          <button
+            type="button"
+            onClick={() => {
+              setActiveTab('library');
+              handleCancelEdit();
+            }}
+            className="text-xs font-extrabold text-indigo-700 hover:text-indigo-900 flex items-center gap-2 transition cursor-pointer"
+          >
+            <ArrowRight className="w-4 h-4 rotate-180" />
+            <span>← Kütüphaneme / İçeriklerime Dön</span>
+          </button>
 
-        <button
-          onClick={() => {
-            setActiveTab('story-set');
-            handleCancelEdit();
+          <span className="text-xs font-bold text-indigo-900 bg-white/80 px-2.5 py-1 rounded-lg border border-indigo-200">
+            {activeTab === 'create-set' && (editingSetId ? 'Set Düzenleme' : 'Yeni Set Oluştur')}
+            {activeTab === 'story-set' && 'Story Set (10 Cümle)'}
+            {activeTab === 'manage-classes' && 'Modül ve Klasör Yönetimi'}
+            {activeTab === 'stories' && 'Hikâyeler & E-Book Studio'}
+            {activeTab === 'tests' && 'İnteraktif Testler'}
+            {activeTab === 'all-sets' && 'Tüm Setler'}
+            {activeTab === 'settings' && 'Şifre & Güvenlik'}
+          </span>
+        </div>
+      )}
+
+      {/* ================================================================= */}
+      {/* DEFAULT TAB: KÜTÜPHANEM (QUIZLET STYLE ORGANIZED DASHBOARD)       */}
+      {/* ================================================================= */}
+      {activeTab === 'library' && (
+        <AdminLibraryView
+          classes={classes}
+          allSetsList={allSetsList}
+          storiesList={storiesList}
+          testsList={testsList}
+          onShare={(item) => setShareItem(item)}
+          onEditSet={(s, c, f) => handleStartEdit(s, c, f)}
+          onDeleteSet={(id, title) => handleDeleteSet(id, title)}
+          onMoveSet={(s, fId) => {
+            setMovingSet(s);
+            setMoveTargetFolderId(fId);
           }}
-          className={`flex-1 py-2.5 px-3 sm:px-4 rounded-xl text-xs sm:text-sm font-semibold transition-all flex items-center justify-center gap-1.5 ${
-            activeTab === 'story-set'
-              ? 'bg-white text-amber-700 shadow-sm'
-              : 'text-slate-600 hover:text-slate-900 font-medium'
-          }`}
-        >
-          <Sparkles className="w-4 h-4 text-amber-500" />
-          <span>Story (10 Cümle)</span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab('manage-classes')}
-          className={`flex-1 py-2.5 px-4 rounded-xl text-xs sm:text-sm font-semibold transition-all flex items-center justify-center gap-2 ${
-            activeTab === 'manage-classes'
-              ? 'bg-white text-brand-700 shadow-sm'
-              : 'text-slate-600 hover:text-slate-900 font-medium'
-          }`}
-        >
-          <FolderPlus className="w-4 h-4 text-indigo-600" />
-          <span>Modül Yönetimi</span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab('all-sets')}
-          className={`flex-1 py-2.5 px-4 rounded-xl text-xs sm:text-sm font-semibold transition-all flex items-center justify-center gap-2 ${
-            activeTab === 'all-sets'
-              ? 'bg-white text-brand-700 shadow-sm'
-              : 'text-slate-600 hover:text-slate-900 font-medium'
-          }`}
-        >
-          <BookOpen className="w-4 h-4 text-emerald-600" />
-          <span>Tüm Setler ({allSetsList.length})</span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab('stories')}
-          className={`flex-1 py-2.5 px-4 rounded-xl text-xs sm:text-sm font-semibold transition-all flex items-center justify-center gap-2 ${
-            activeTab === 'stories'
-              ? 'bg-white text-purple-700 shadow-sm'
-              : 'text-slate-600 hover:text-slate-900 font-medium'
-          }`}
-        >
-          <Sparkles className="w-4 h-4 text-purple-600" />
-          <span>Hikâyeler ({storiesList.length})</span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab('tests')}
-          className={`flex-1 py-2.5 px-3 sm:px-4 rounded-xl text-xs sm:text-sm font-semibold transition-all flex items-center justify-center gap-2 ${
-            activeTab === 'tests'
-              ? 'bg-white text-blue-700 shadow-sm'
-              : 'text-slate-600 hover:text-slate-900 font-medium'
-          }`}
-        >
-          <CheckSquare className="w-4 h-4 text-blue-600" />
-          <span>Testler ({testsList.length})</span>
-        </button>
-      </div>
+          onOpenSetAiModal={(s) => handleOpenSetAiModal(s)}
+          onReorderModule={(id, dir) => handleReorderModule(id, dir)}
+          onStartEditModule={(c) => handleStartEditModule(c)}
+          onDeleteModule={(id, name) => handleDeleteModule(id, name)}
+          onCreateContent={(type, classId, folderId) => {
+            if (type === 'set') {
+              handleCancelEdit();
+              if (classId) setSelectedClassId(classId);
+              if (folderId) setSelectedFolderId(folderId);
+              setActiveTab('create-set');
+            } else if (type === 'story-set') {
+              if (classId) setStorySetClassId(classId);
+              if (folderId) setStorySetFolderId(folderId);
+              setActiveTab('story-set');
+            } else if (type === 'module') {
+              setActiveTab('manage-classes');
+            } else if (type === 'test') {
+              setActiveTab('tests');
+            }
+          }}
+          onQuickAddFolder={(classId) => {
+            setInlineFolderClassId(classId);
+            setInlineFolderTargetContext('set');
+            setShowInlineFolderModal(true);
+          }}
+          onEditStory={(st) => handleStartEditStory(st)}
+          onDeleteStory={(id, title) => handleDeleteStory(id, title)}
+          onEditTest={() => setActiveTab('tests')}
+          onDeleteTest={async (id, title) => {
+            if (!confirm(`"${title}" testini silmek istediğinize emin misiniz?`)) return;
+            const res = await fetch('/api/admin/delete-test', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ test_id: id }),
+            });
+            if (res.ok) {
+              showToast('Test silindi.');
+              loadHierarchy();
+            }
+          }}
+        />
+      )}
 
       {/* ================================================================= */}
       {/* TAB 1: YENİ SET OLUŞTUR VEYA DÜZENLE                              */}
@@ -1853,165 +2059,187 @@ export default function AdminPage() {
               </div>
             </div>
 
-            {/* 2. Konu Anlatımı & Ders Notları (İsteğe Bağlı) */}
-            <div className="bg-white rounded-3xl border border-slate-200/80 p-6 shadow-sm space-y-4">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <h2 className="text-base font-bold text-slate-900">
-                      2. Konu Anlatımı & Notlar (İsteğe Bağlı)
-                    </h2>
-                    <span className="text-[11px] font-semibold px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700">
-                      Zengin Metin / Canva Uyumlu
+            {/* 2. Konu Anlatımı & Ders Notları (İsteğe Bağlı Akordeon) */}
+            <div className="bg-white rounded-3xl border border-slate-200/80 p-5 sm:p-6 shadow-xs space-y-4">
+              <div
+                onClick={() => setIsNotesExpanded(!isNotesExpanded)}
+                className="flex items-center justify-between cursor-pointer select-none"
+              >
+                <div className="flex items-center gap-2.5">
+                  <h2 className="text-base font-bold text-slate-900">
+                    2. Konu Anlatımı & Gramer Notları
+                  </h2>
+                  {studyNotes?.trim() ? (
+                    <span className="text-[11px] font-bold px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200">
+                      ✓ Not Eklenmiş
                     </span>
-                  </div>
-                  <p className="text-xs font-normal text-slate-500 mt-0.5">
-                    Bu alana yazdığınız gramer kuralları veya Canva/Word'den kopyaladığınız renkli özetler doğrudan korunur. Boş bırakırsanız öğrenci tarafında Konu Anlatımı butonu görünmez.
-                  </p>
+                  ) : (
+                    <span className="text-[11px] font-semibold px-2 py-0.5 rounded-md bg-slate-100 text-slate-600">
+                      İsteğe Bağlı
+                    </span>
+                  )}
                 </div>
 
-                <div className="flex items-center gap-1.5 self-end sm:self-auto bg-slate-100 p-1 rounded-xl">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setNotesViewMode('visual');
-                      setTimeout(() => {
-                        if (notesEditorRef.current) notesEditorRef.current.innerHTML = studyNotes;
-                      }, 0);
-                    }}
-                    className={`px-2.5 py-1 text-xs font-semibold rounded-lg transition ${
-                      notesViewMode === 'visual'
-                        ? 'bg-white text-indigo-700 shadow-xs'
-                        : 'text-slate-600 hover:text-slate-900'
-                    }`}
-                  >
-                    Görsel Editör
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setNotesViewMode('code')}
-                    className={`px-2.5 py-1 text-xs font-semibold rounded-lg transition ${
-                      notesViewMode === 'code'
-                        ? 'bg-white text-indigo-700 shadow-xs'
-                        : 'text-slate-600 hover:text-slate-900'
-                    }`}
-                  >
-                    HTML / Kod
-                  </button>
-                </div>
+                <button
+                  type="button"
+                  className="text-xs font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1 cursor-pointer"
+                >
+                  <span>{isNotesExpanded ? 'Daralt' : 'Not Ekle / Genişlet'}</span>
+                  {isNotesExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                </button>
               </div>
 
-              {notesViewMode === 'visual' ? (
-                <div className="space-y-2">
-                  {/* Formatting Toolbar */}
-                  <div className="flex flex-wrap items-center gap-1.5 p-2 rounded-xl bg-slate-50 border border-slate-200/80">
-                    <button
-                      type="button"
-                      onClick={() => formatDoc('bold')}
-                      className="px-2.5 py-1 rounded-lg bg-white border border-slate-200 text-xs font-bold text-slate-800 hover:bg-slate-100 transition shadow-2xs"
-                      title="Kalınlaştır (Bold)"
-                    >
-                      B
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => formatDoc('italic')}
-                      className="px-2.5 py-1 rounded-lg bg-white border border-slate-200 text-xs font-serif italic text-slate-800 hover:bg-slate-100 transition shadow-2xs"
-                      title="İtalik"
-                    >
-                      I
-                    </button>
+              {isNotesExpanded && (
+                <div className="space-y-4 pt-3 border-t border-slate-100 animate-in fade-in duration-200">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <p className="text-xs font-normal text-slate-500">
+                      Bu alana yazdığınız gramer kuralları veya Canva/Word'den kopyaladığınız renkli özetler doğrudan korunur. Boş bırakırsanız öğrenci tarafında Konu Anlatımı butonu görünmez.
+                    </p>
 
-                    <div className="w-[1px] h-4 bg-slate-200 mx-0.5" />
-
-                    <button
-                      type="button"
-                      onClick={() => formatDoc('foreColor', '#dc2626')}
-                      className="px-2.5 py-1 rounded-lg bg-red-50 border border-red-200 text-xs font-bold text-red-600 hover:bg-red-100 transition shadow-2xs"
-                      title="Kırmızı Yazı Rengi"
-                    >
-                      Kırmızı
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => formatDoc('foreColor', '#16a34a')}
-                      className="px-2.5 py-1 rounded-lg bg-emerald-50 border border-emerald-200 text-xs font-bold text-emerald-600 hover:bg-emerald-100 transition shadow-2xs"
-                      title="Yeşil Yazı Rengi"
-                    >
-                      Yeşil
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => formatDoc('foreColor', '#2563eb')}
-                      className="px-2.5 py-1 rounded-lg bg-blue-50 border border-blue-200 text-xs font-bold text-blue-600 hover:bg-blue-100 transition shadow-2xs"
-                      title="Mavi Yazı Rengi"
-                    >
-                      Mavi
-                    </button>
-
-                    <div className="w-[1px] h-4 bg-slate-200 mx-0.5" />
-
-                    <button
-                      type="button"
-                      onClick={() => formatDoc('hiliteColor', '#fef08a')}
-                      className="px-2.5 py-1 rounded-lg bg-amber-50 border border-amber-200 text-xs font-semibold text-amber-800 hover:bg-amber-100 transition shadow-2xs"
-                      title="Sarı Vurgu (Highlight)"
-                    >
-                      🟡 Vurgula
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => formatDoc('formatBlock', '<h3>')}
-                      className="px-2.5 py-1 rounded-lg bg-white border border-slate-200 text-xs font-semibold text-slate-800 hover:bg-slate-100 transition shadow-2xs"
-                      title="Alt Başlık Ekle"
-                    >
-                      Başlık (H3)
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => formatDoc('insertUnorderedList')}
-                      className="px-2.5 py-1 rounded-lg bg-white border border-slate-200 text-xs font-semibold text-slate-800 hover:bg-slate-100 transition shadow-2xs"
-                      title="Madde İşareti Listesi"
-                    >
-                      • Liste
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => formatDoc('removeFormat')}
-                      className="ml-auto px-2 py-1 rounded-lg text-slate-400 hover:text-slate-600 text-xs transition"
-                      title="Biçimi Temizle"
-                    >
-                      Temizle
-                    </button>
+                    <div className="flex items-center gap-1.5 self-end sm:self-auto bg-slate-100 p-1 rounded-xl">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setNotesViewMode('visual');
+                          setTimeout(() => {
+                            if (notesEditorRef.current) notesEditorRef.current.innerHTML = studyNotes;
+                          }, 0);
+                        }}
+                        className={`px-2.5 py-1 text-xs font-semibold rounded-lg transition ${
+                          notesViewMode === 'visual'
+                            ? 'bg-white text-indigo-700 shadow-xs'
+                            : 'text-slate-600 hover:text-slate-900'
+                        }`}
+                      >
+                        Görsel Editör
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setNotesViewMode('code')}
+                        className={`px-2.5 py-1 text-xs font-semibold rounded-lg transition ${
+                          notesViewMode === 'code'
+                            ? 'bg-white text-indigo-700 shadow-xs'
+                            : 'text-slate-600 hover:text-slate-900'
+                        }`}
+                      >
+                        HTML / Kod
+                      </button>
+                    </div>
                   </div>
 
-                  {/* ContentEditable Visual Area */}
-                  <div
-                    ref={notesEditorRef}
-                    contentEditable
-                    suppressContentEditableWarning
-                    onInput={(e) => setStudyNotes(e.currentTarget.innerHTML)}
-                    onBlur={(e) => setStudyNotes(e.currentTarget.innerHTML)}
-                    className="w-full min-h-[140px] max-h-[300px] overflow-y-auto p-4 rounded-2xl border border-slate-200 bg-white focus:outline-none focus:border-brand-500 text-sm leading-relaxed text-slate-800 font-normal shadow-inner"
-                  />
-                </div>
-              ) : (
-                <div>
-                  <textarea
-                    rows={6}
-                    value={studyNotes}
-                    onChange={(e) => {
-                      setStudyNotes(e.target.value);
-                      if (notesEditorRef.current) {
-                        notesEditorRef.current.innerHTML = e.target.value;
-                      }
-                    }}
-                    placeholder="<p><b>Gramer Kuralı:</b> ...</p>"
-                    className="w-full p-3 rounded-2xl border border-slate-200 font-mono text-xs text-slate-800 focus:outline-none focus:border-brand-500 bg-slate-50"
-                  />
+                  {notesViewMode === 'visual' ? (
+                    <div className="space-y-2">
+                      {/* Formatting Toolbar */}
+                      <div className="flex flex-wrap items-center gap-1.5 p-2 rounded-xl bg-slate-50 border border-slate-200/80">
+                        <button
+                          type="button"
+                          onClick={() => formatDoc('bold')}
+                          className="px-2.5 py-1 rounded-lg bg-white border border-slate-200 text-xs font-bold text-slate-800 hover:bg-slate-100 transition shadow-2xs"
+                          title="Kalınlaştır (Bold)"
+                        >
+                          B
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => formatDoc('italic')}
+                          className="px-2.5 py-1 rounded-lg bg-white border border-slate-200 text-xs font-serif italic text-slate-800 hover:bg-slate-100 transition shadow-2xs"
+                          title="İtalik"
+                        >
+                          I
+                        </button>
+
+                        <div className="w-[1px] h-4 bg-slate-200 mx-0.5" />
+
+                        <button
+                          type="button"
+                          onClick={() => formatDoc('foreColor', '#dc2626')}
+                          className="px-2.5 py-1 rounded-lg bg-red-50 border border-red-200 text-xs font-bold text-red-600 hover:bg-red-100 transition shadow-2xs"
+                          title="Kırmızı Yazı Rengi"
+                        >
+                          Kırmızı
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => formatDoc('foreColor', '#16a34a')}
+                          className="px-2.5 py-1 rounded-lg bg-emerald-50 border border-emerald-200 text-xs font-bold text-emerald-600 hover:bg-emerald-100 transition shadow-2xs"
+                          title="Yeşil Yazı Rengi"
+                        >
+                          Yeşil
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => formatDoc('foreColor', '#2563eb')}
+                          className="px-2.5 py-1 rounded-lg bg-blue-50 border border-blue-200 text-xs font-bold text-blue-600 hover:bg-blue-100 transition shadow-2xs"
+                          title="Mavi Yazı Rengi"
+                        >
+                          Mavi
+                        </button>
+
+                        <div className="w-[1px] h-4 bg-slate-200 mx-0.5" />
+
+                        <button
+                          type="button"
+                          onClick={() => formatDoc('hiliteColor', '#fef08a')}
+                          className="px-2.5 py-1 rounded-lg bg-amber-50 border border-amber-200 text-xs font-semibold text-amber-800 hover:bg-amber-100 transition shadow-2xs"
+                          title="Sarı Vurgu (Highlight)"
+                        >
+                          🟡 Vurgula
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => formatDoc('formatBlock', '<h3>')}
+                          className="px-2.5 py-1 rounded-lg bg-white border border-slate-200 text-xs font-semibold text-slate-800 hover:bg-slate-100 transition shadow-2xs"
+                          title="Alt Başlık Ekle"
+                        >
+                          Başlık (H3)
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => formatDoc('insertUnorderedList')}
+                          className="px-2.5 py-1 rounded-lg bg-white border border-slate-200 text-xs font-semibold text-slate-800 hover:bg-slate-100 transition shadow-2xs"
+                          title="Madde İşareti Listesi"
+                        >
+                          • Liste
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => formatDoc('removeFormat')}
+                          className="ml-auto px-2 py-1 rounded-lg text-slate-400 hover:text-slate-600 text-xs transition"
+                          title="Biçimi Temizle"
+                        >
+                          Temizle
+                        </button>
+                      </div>
+
+                      {/* ContentEditable Visual Area */}
+                      <div
+                        ref={notesEditorRef}
+                        contentEditable
+                        suppressContentEditableWarning
+                        onInput={(e) => setStudyNotes(e.currentTarget.innerHTML)}
+                        onBlur={(e) => setStudyNotes(e.currentTarget.innerHTML)}
+                        className="w-full min-h-[140px] max-h-[300px] overflow-y-auto p-4 rounded-2xl border border-slate-200 bg-white focus:outline-none focus:border-brand-500 text-sm leading-relaxed text-slate-800 font-normal shadow-inner"
+                      />
+                    </div>
+                  ) : (
+                    <div>
+                      <textarea
+                        rows={6}
+                        value={studyNotes}
+                        onChange={(e) => {
+                          setStudyNotes(e.target.value);
+                          if (notesEditorRef.current) {
+                            notesEditorRef.current.innerHTML = e.target.value;
+                          }
+                        }}
+                        placeholder="<p><b>Gramer Kuralı:</b> ...</p>"
+                        className="w-full p-3 rounded-2xl border border-slate-200 font-mono text-xs text-slate-800 focus:outline-none focus:border-brand-500 bg-slate-50"
+                      />
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -2028,13 +2256,41 @@ export default function AdminPage() {
                   </p>
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
+                  {/* AI Quality Selector Toggle */}
+                  <div className="flex items-center bg-slate-100 p-0.5 rounded-xl border border-slate-200 text-xs shadow-2xs">
+                    <button
+                      type="button"
+                      onClick={() => setAiQuality('fast')}
+                      className={`px-2.5 py-1 rounded-lg transition-all flex items-center gap-1 ${
+                        aiQuality === 'fast'
+                          ? 'bg-white text-purple-700 font-bold shadow-xs'
+                          : 'text-slate-500 hover:text-slate-800'
+                      }`}
+                      title="⚡ Standart: 0.5 saniye, 10 Kuruş ($0.003), 10$ ile ~3.300 görsel"
+                    >
+                      <span>⚡ Standart (10 Krş)</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setAiQuality('hd')}
+                      className={`px-2.5 py-1 rounded-lg transition-all flex items-center gap-1 ${
+                        aiQuality === 'hd'
+                          ? 'bg-purple-600 text-white font-bold shadow-xs'
+                          : 'text-slate-500 hover:text-slate-800'
+                      }`}
+                      title="🌟 Sinematik HD: 2 saniye, Pixar/Disney kalitesi (~85 Kuruş), 10$ ile ~400 görsel"
+                    >
+                      <span>🌟 Sinematik HD</span>
+                    </button>
+                  </div>
+
                   <button
                     type="button"
                     onClick={handleGenerateAllCardsImages}
                     disabled={cards.every((c) => !c.english_text.trim()) || !!aiBatchProgress?.isOpen}
                     className="px-3 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-2xs transition-all active:scale-95 disabled:opacity-40"
-                    title="Tüm kartlar için sırayla AI cartoon çizimler üretir"
+                    title="Tüm kartlar için seçili kalitede AI cartoon çizimler üretir"
                   >
                     <Sparkles className="w-3.5 h-3.5" />
                     <span>✨ AI ile Tümünü Çiz</span>
@@ -2532,12 +2788,40 @@ export default function AdminPage() {
                 </div>
 
                 <div className="flex items-center gap-2 flex-wrap">
+                  {/* AI Quality Selector Toggle */}
+                  <div className="flex items-center bg-slate-100 p-0.5 rounded-xl border border-slate-200 text-xs shadow-2xs">
+                    <button
+                      type="button"
+                      onClick={() => setAiQuality('fast')}
+                      className={`px-2.5 py-1.5 rounded-lg transition-all flex items-center gap-1 ${
+                        aiQuality === 'fast'
+                          ? 'bg-white text-purple-700 font-bold shadow-xs'
+                          : 'text-slate-500 hover:text-slate-800'
+                      }`}
+                      title="⚡ Standart: 0.5 saniye, 10 Kuruş ($0.003), 10$ ile ~3.300 görsel"
+                    >
+                      <span>⚡ Standart (10 Krş)</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setAiQuality('hd')}
+                      className={`px-2.5 py-1.5 rounded-lg transition-all flex items-center gap-1 ${
+                        aiQuality === 'hd'
+                          ? 'bg-purple-600 text-white font-bold shadow-xs'
+                          : 'text-slate-500 hover:text-slate-800'
+                      }`}
+                      title="🌟 Sinematik HD: 2 saniye, Pixar/Disney kalitesi (~85 Kuruş), 10$ ile ~400 görsel"
+                    >
+                      <span>🌟 Sinematik HD</span>
+                    </button>
+                  </div>
+
                   <button
                     type="button"
                     onClick={handleGenerateAllStoryRowsImages}
                     disabled={storyRows.every((r) => !r.english_text.trim()) || !!aiBatchProgress?.isOpen}
                     className="px-3.5 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-2xs transition-all active:scale-95 disabled:opacity-40"
-                    title="10 cümlenin her biri için AI cartoon görsel üretir"
+                    title="10 cümlenin her biri için seçili kalitede AI cartoon görsel üretir"
                   >
                     <Sparkles className="w-4 h-4" />
                     <span>✨ Cümleleri AI ile Çiz</span>
@@ -3285,29 +3569,20 @@ export default function AdminPage() {
                     </Link>
 
                     <button
-                      onClick={() => {
-                        const fullUrl = `${window.location.origin}/set/${s.slug}`;
-                        navigator.clipboard.writeText(fullUrl);
-                        showToast('Link kopyalandı!');
-                      }}
-                      className="p-1.5 rounded-lg bg-white border border-slate-200 text-slate-500 hover:text-slate-800"
-                      title="Linki Kopyala"
+                      type="button"
+                      onClick={() =>
+                        setShareItem({
+                          title: s.title,
+                          url: `${window.location.origin}/set/${s.slug}`,
+                          type: 'set',
+                          subtitle: `${s.className} > ${s.folderName} (${s.cardCount} Kart)`,
+                        })
+                      }
+                      className="px-2.5 py-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold flex items-center gap-1 transition cursor-pointer"
+                      title="Seti Paylaş"
                     >
-                      <Copy className="w-3.5 h-3.5" />
-                    </button>
-
-                    <button
-                      onClick={() => {
-                        const fullUrl = `${window.location.origin}/set/${s.slug}`;
-                        const text = encodeURIComponent(
-                          `Sevgili öğrenciler, "${s.title}" çalışma setimiz hazır:\n${fullUrl}`
-                        );
-                        window.open(`https://api.whatsapp.com/send?text=${text}`, '_blank');
-                      }}
-                      className="p-1.5 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm"
-                      title="WhatsApp'ta Paylaş"
-                    >
-                      <Send className="w-3.5 h-3.5" />
+                      <Share2 className="w-3.5 h-3.5" />
+                      <span>Paylaş</span>
                     </button>
 
                     <button
@@ -3941,6 +4216,11 @@ export default function AdminPage() {
           showToast={showToast}
         />
       )}
+
+      {/* ================================================================= */}
+      {/* TAB 7: AKADEMİ ŞİFRESİ VE AYARLAR                                 */}
+      {/* ================================================================= */}
+      {activeTab === 'settings' && <AdminSettingsManager />}
       {movingSet && (
         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl p-6 max-w-md w-full space-y-4 shadow-2xl animate-in zoom-in-95 duration-150">

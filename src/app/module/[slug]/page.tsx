@@ -1,11 +1,12 @@
 'use client';
 
-import { Suspense, useEffect, useState, useMemo } from 'react';
+import { Suspense, useState, useMemo } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { supabase } from '@/lib/supabase';
 import { decodeModuleMetadata, MODULE_THEMES } from '@/lib/module-utils';
 import { decodeSetDescription } from '@/lib/set-utils';
+import { useCachedModule, preloadSet, preloadTest, preloadStory } from '@/lib/api-cache';
+import { ModuleSkeleton } from '@/components/common/Skeletons';
 import {
   ArrowLeft,
   Search,
@@ -24,80 +25,16 @@ function ModuleDetailContent() {
   const slug = params?.slug as string;
   const folderParam = searchParams.get('folder');
 
-  const [moduleData, setModuleData] = useState<any>(null);
-  const [folders, setFolders] = useState<any[]>([]);
-  const [sets, setSets] = useState<any[]>([]);
-  const [tests, setTests] = useState<any[]>([]);
-  const [stories, setStories] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data: cached, error, isLoading } = useCachedModule(slug);
+
+  const moduleData = cached?.moduleData || null;
+  const folders = cached?.folders || [];
+  const sets = cached?.sets || [];
+  const tests = cached?.tests || [];
+  const stories = cached?.stories || [];
+  const loading = isLoading && !cached;
+
   const [searchQuery, setSearchQuery] = useState('');
-
-  useEffect(() => {
-    async function loadModule() {
-      if (!slug) return;
-      try {
-        setLoading(true);
-        // 1. Fetch module by slug
-        const { data: cls, error: clsErr } = await supabase
-          .from('classes')
-          .select('*')
-          .eq('slug', slug)
-          .single();
-
-        if (clsErr || !cls) {
-          console.error('Modül bulunamadı:', clsErr);
-          setLoading(false);
-          return;
-        }
-
-        setModuleData(cls);
-
-        // 2. Fetch folders of this module
-        const { data: fList } = await supabase
-          .from('folders')
-          .select('*')
-          .eq('class_id', cls.id)
-          .order('order_index');
-
-        const folderIds = (fList || []).map((f) => f.id);
-        setFolders(fList || []);
-
-        // 3. Fetch sets, tests, and stories belonging to these folders
-        if (folderIds.length > 0) {
-          const [setsRes, testsRes, storiesRes] = await Promise.all([
-            supabase
-              .from('sets')
-              .select('*, set_cards(id), folders(name)')
-              .in('folder_id', folderIds)
-              .eq('is_published', true)
-              .order('order_index'),
-            supabase
-              .from('manual_tests')
-              .select('*, test_questions(id), folders(name)')
-              .in('folder_id', folderIds)
-              .eq('is_published', true)
-              .order('order_index'),
-            supabase
-              .from('stories')
-              .select('*, story_pages(id), folders(name)')
-              .in('folder_id', folderIds)
-              .eq('is_published', true)
-              .order('created_at', { ascending: false }),
-          ]);
-
-          if (setsRes.data) setSets(setsRes.data);
-          if (testsRes.data) setTests(testsRes.data);
-          if (storiesRes.data) setStories(storiesRes.data);
-        }
-      } catch (err) {
-        console.error('Modül yükleme hatası:', err);
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    loadModule();
-  }, [slug]);
 
   const meta = useMemo(() => {
     if (!moduleData) return null;
@@ -114,6 +51,7 @@ function ModuleDetailContent() {
       list.push({
         id: `set-${s.id}`,
         rawId: s.id,
+        slug: s.slug,
         type: isStory ? 'story-set' : 'set',
         typeLabel: isStory ? 'Story' : 'Kelime Seti',
         title: s.title,
@@ -135,6 +73,7 @@ function ModuleDetailContent() {
       list.push({
         id: `test-${t.id}`,
         rawId: t.id,
+        slug: t.slug,
         type: 'test',
         typeLabel: 'Test',
         title: t.title,
@@ -156,6 +95,7 @@ function ModuleDetailContent() {
       list.push({
         id: `story-${st.id}`,
         rawId: st.id,
+        slug: st.slug,
         type: 'story',
         typeLabel: 'Sesli Hikâye',
         title: st.title,
@@ -229,12 +169,7 @@ function ModuleDetailContent() {
   }, [allItems, currentFolder, hasCustomFolders, searchQuery]);
 
   if (loading) {
-    return (
-      <div className="min-h-[50vh] flex flex-col items-center justify-center space-y-3">
-        <div className="w-10 h-10 border-4 border-slate-200 border-t-brand-600 rounded-full animate-spin" />
-        <p className="text-sm font-medium text-slate-500">Modül yükleniyor...</p>
-      </div>
-    );
+    return <ModuleSkeleton />;
   }
 
   if (!moduleData || !meta) {
@@ -450,6 +385,20 @@ function ModuleDetailContent() {
       <Link
         key={item.id}
         href={item.href}
+        onMouseEnter={() => {
+          if (item.slug) {
+            if (item.type === 'set' || item.type === 'story-set') preloadSet(item.slug);
+            else if (item.type === 'test') preloadTest(item.slug);
+            else if (item.type === 'story') preloadStory(item.slug);
+          }
+        }}
+        onTouchStart={() => {
+          if (item.slug) {
+            if (item.type === 'set' || item.type === 'story-set') preloadSet(item.slug);
+            else if (item.type === 'test') preloadTest(item.slug);
+            else if (item.type === 'story') preloadStory(item.slug);
+          }
+        }}
         className="group bg-white rounded-2xl border border-slate-200/90 p-4 hover:border-brand-400 hover:shadow-md transition-all flex flex-col justify-between space-y-3"
       >
         <div className="flex items-start gap-3">

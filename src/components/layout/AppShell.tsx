@@ -1,11 +1,25 @@
 'use client';
 
+import { useEffect } from 'react';
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
 import OfflineState from '@/components/common/OfflineState';
+import StudentAuthGate from '@/components/auth/StudentAuthGate';
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+
+  useEffect(() => {
+    async function hideSplash() {
+      try {
+        const { SplashScreen } = await import('@capacitor/splash-screen');
+        await SplashScreen.hide({ fadeOutDuration: 400 });
+      } catch (e) {
+        // Silently ignore in browser environments
+      }
+    }
+    hideSplash();
+  }, []);
 
   // Active study mode: When student is inside an interactive set, test, or story
   const isStudyMode =
@@ -48,8 +62,20 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             : 'max-w-6xl px-4 sm:px-6 pt-2 sm:pt-6 pb-safe pb-6 sm:pb-8'
         }`}
       >
-        {children}
+        <StudentAuthGate>{children}</StudentAuthGate>
       </main>
+
+      {/* 3. Global Footer */}
+      {!isStudyMode && (
+        <footer className="border-t border-slate-200/80 bg-white py-6 px-4 text-center text-xs text-slate-500 space-y-2 pb-safe">
+          <div className="flex items-center justify-center gap-4">
+            <Link href="/gizlilik" className="hover:text-brand-600 transition font-medium">
+              Gizlilik Politikası (Privacy Policy)
+            </Link>
+          </div>
+          <p>© {new Date().getFullYear()} Ziya Baran Akademi. Tüm hakları saklıdır.</p>
+        </footer>
+      )}
     </div>
   );
 }

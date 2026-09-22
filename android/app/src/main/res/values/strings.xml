@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Ziya Baran Akademi</string>
+    <string name="title_activity_main">Ziya Baran Akademi</string>
+    <string name="package_name">com.ziyabaran.akademi</string>
+    <string name="custom_url_scheme">com.ziyabaran.akademi</string>
+</resources>

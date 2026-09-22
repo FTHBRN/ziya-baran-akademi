@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
 import { encodeCardTurkish } from '@/lib/card-utils';
+import { decodeSetDescription, encodeSetDescription } from '@/lib/set-utils';
 
 process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
 
@@ -17,9 +18,40 @@ export async function POST(request: Request) {
     }
 
     // 1. Update set metadata
+    let finalDescription = (description || '').trim();
+
+    // Prevent accidental stripping of story metadata (e.g. This is my story sets)
+    const { data: existingSet } = await supabaseAdmin
+      .from('sets')
+      .select('description, title')
+      .eq('id', set_id)
+      .single();
+
+    if (existingSet) {
+      const existingDecoded = decodeSetDescription(existingSet.description);
+      const incomingDecoded = decodeSetDescription(finalDescription);
+      const isStory =
+        existingDecoded.storyMeta?.isStory ||
+        /^this is my story/i.test(title.trim()) ||
+        /^this is my story/i.test(existingSet.title || '');
+
+      if (isStory && !incomingDecoded.storyMeta?.isStory) {
+        const storyMeta = existingDecoded.storyMeta || {
+          isStory: true,
+          subtitle: incomingDecoded.description || existingDecoded.description,
+        };
+        finalDescription = encodeSetDescription(
+          incomingDecoded.description || existingDecoded.description,
+          incomingDecoded.coverImageUrl || existingDecoded.coverImageUrl,
+          incomingDecoded.studyNotes || existingDecoded.studyNotes,
+          storyMeta
+        );
+      }
+    }
+
     const updatePayload: any = {
       title: title.trim(),
-      description: (description || '').trim(),
+      description: finalDescription,
     };
     if (folder_id) {
       updatePayload.folder_id = folder_id;

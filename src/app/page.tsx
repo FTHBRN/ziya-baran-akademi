@@ -1,10 +1,10 @@
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { supabase } from '@/lib/supabase';
 import { decodeModuleMetadata, MODULE_THEMES } from '@/lib/module-utils';
+import { useCachedHomeModules, preloadModule } from '@/lib/api-cache';
 import {
   Search,
   ArrowRight,
@@ -15,32 +15,12 @@ import {
 
 export default function HomePage() {
   const router = useRouter();
-  const [modules, setModules] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data: cachedModules, isLoading } = useCachedHomeModules();
+  const modules = cachedModules || [];
+  const loading = isLoading && !cachedModules;
+
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-
-  useEffect(() => {
-    async function loadModules() {
-      try {
-        setLoading(true);
-        const { data, error } = await supabase
-          .from('classes')
-          .select('*, folders(*, sets(id), manual_tests(id), stories(id))')
-          .order('order_index', { ascending: true });
-
-        if (data) {
-          setModules(data);
-        }
-      } catch (err) {
-        console.error('Modüller yüklenirken hata:', err);
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    loadModules();
-  }, []);
 
   // Filter modules for search
   const filteredModules = useMemo(() => {
@@ -140,18 +120,6 @@ export default function HomePage() {
               </p>
             </div>
           </div>
-
-          {/* Quick Admin Shortcut */}
-          <Link
-            href="/admin"
-            className="w-full py-3 px-4 rounded-2xl bg-white hover:bg-slate-50 border border-slate-200 text-xs font-bold text-slate-700 shadow-2xs flex items-center justify-between transition-all group"
-          >
-            <span className="flex items-center gap-2">
-              <GraduationCap className="w-4 h-4 text-purple-600" />
-              <span>Öğretmen / Admin Paneli</span>
-            </span>
-            <ChevronRight className="w-4 h-4 text-slate-400 group-hover:translate-x-0.5 transition-transform" />
-          </Link>
         </aside>
 
         {/* ================================================================= */}
@@ -217,6 +185,8 @@ export default function HomePage() {
                   <Link
                     key={m.id}
                     href={`/module/${m.slug}`}
+                    onMouseEnter={() => preloadModule(m.slug)}
+                    onTouchStart={() => preloadModule(m.slug)}
                     className={`group relative rounded-3xl border ${theme.border} ${theme.cardBg} p-5 sm:p-6 shadow-xs hover:shadow-md transition-all duration-300 hover:scale-[1.01] flex flex-col justify-between overflow-hidden`}
                   >
                       {/* Main Title & Description */}

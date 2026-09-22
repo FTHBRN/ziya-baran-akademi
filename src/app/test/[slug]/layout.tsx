@@ -1,48 +1,76 @@
-import { Metadata } from 'next';
-import { supabase } from '@/lib/supabase';
+import type { Metadata } from 'next';
+import { supabaseAdmin } from '@/lib/supabase';
 
-interface Props {
-  params: Promise<{ slug: string }>;
-  children: React.ReactNode;
-}
+process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
 
-export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const { slug } = await params;
+export async function generateMetadata({
+  params,
+}: {
+  params: { slug: string };
+}): Promise<Metadata> {
+  const defaultImage = 'https://ziya-baran-akademi.vercel.app/logo-icon.png';
+  const defaultTitle = 'İnteraktif Test | Ziya Baran Akademi';
+  const defaultDesc = 'Ziya Baran Akademi çoktan seçmeli interaktif İngilizce testleri.';
 
   try {
-    const { data: testItem } = await supabase
+    const { data: testItem } = await supabaseAdmin
       .from('manual_tests')
-      .select('title, description')
-      .eq('slug', slug)
-      .maybeSingle();
+      .select('title, description, test_questions(image_url)')
+      .eq('slug', params.slug)
+      .single();
 
     if (!testItem) {
       return {
-        title: 'Test Bulunamadı | Ziya Baran Akademi',
+        title: defaultTitle,
+        description: defaultDesc,
       };
     }
 
-    const title = `${testItem.title} - Testi Çöz | Ziya Baran Akademi`;
-    const description = testItem.description || 'İnteraktif 4 şıklı İngilizce testi. Hemen çözün ve kendinizi test edin!';
+    const title = `${testItem.title} | Ziya Baran Akademi`;
+    const cleanDesc =
+      testItem.description ||
+      `${testItem.test_questions?.length || 0} soruluk interaktif İngilizce testi.`;
+
+    // Image hierarchy:
+    // 1. Question image
+    // 2. Platform logo
+    let chosenImage: string | undefined;
+    if (testItem.test_questions && testItem.test_questions.length > 0) {
+      const firstWithImg = testItem.test_questions.find((q: any) => q.image_url?.trim());
+      if (firstWithImg) chosenImage = firstWithImg.image_url.trim();
+    }
+    const finalImage = chosenImage || defaultImage;
 
     return {
       title,
-      description,
+      description: cleanDesc,
       openGraph: {
-        title,
-        description,
-        type: 'website',
+        title: testItem.title,
+        description: cleanDesc,
+        url: `https://ziya-baran-akademi.vercel.app/test/${params.slug}`,
         siteName: 'Ziya Baran Akademi',
+        images: [
+          {
+            url: finalImage,
+            width: 1200,
+            height: 630,
+            alt: testItem.title,
+          },
+        ],
+        locale: 'tr_TR',
+        type: 'website',
       },
       twitter: {
-        card: 'summary',
-        title,
-        description,
+        card: 'summary_large_image',
+        title: testItem.title,
+        description: cleanDesc,
+        images: [finalImage],
       },
     };
-  } catch (e) {
+  } catch {
     return {
-      title: 'İngilizce Testi | Ziya Baran Akademi',
+      title: defaultTitle,
+      description: defaultDesc,
     };
   }
 }
