@@ -1,0 +1,83 @@
+name: Build Android AAB
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main, master ]
+    paths:
+      - 'android/**'
+      - '.github/workflows/build-android.yml'
+      - 'capacitor.config.ts'
+      - 'package.json'
+      - 'src/**'
+      - 'public/**'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - name: Setup Java JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Sync Capacitor Android
+        run: npx cap sync android
+
+      - name: Generate Keystore if not present
+        run: |
+          if [ ! -f "android/app/ziyabaran-release.jks" ]; then
+            echo "Generating release keystore..."
+            keytool -genkeypair -v \
+              -keystore android/app/ziyabaran-release.jks \
+              -alias ziyabaran \
+              -keyalg RSA \
+              -keysize 2048 \
+              -validity 10000 \
+              -storepass ziyabaranakademi \
+              -keypass ziyabaranakademi \
+              -dname "CN=Ziya Baran, OU=Akademi, O=Ziya Baran Akademi, L=Izmir, ST=Izmir, C=TR"
+          fi
+
+      - name: Make Gradle executable
+        run: chmod +x android/gradlew
+
+      - name: Accept Android SDK Licenses & Install Platforms
+        run: |
+          yes | sdkmanager --licenses || true
+          sdkmanager "platforms;android-36" "platforms;android-35" "build-tools;36.0.0" || true
+
+      - name: Build Android App Bundle (AAB)
+        run: |
+          cd android
+          ./gradlew bundleRelease --stacktrace
+
+      - name: Upload Signed AAB Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ziya-baran-akademi-android-aab
+          path: android/app/build/outputs/bundle/release/app-release.aab
+          retention-days: 14
+
+      - name: Upload Keystore Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ziya-baran-keystore
+          path: android/app/ziyabaran-release.jks
+          retention-days: 30
