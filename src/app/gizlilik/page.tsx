@@ -131,7 +131,7 @@ export default function PrivacyPolicyPage() {
             </p>
             <div className="p-4 rounded-2xl bg-slate-50 border border-slate-150 text-sm text-slate-800 space-y-1 font-medium">
               <p><strong>Kurum:</strong> Ziya Baran Akademi</p>
-              <p><strong>E-posta:</strong> info@ziyabaranakademi.com</p>
+              <p><strong>E-posta:</strong> ziyabaranakademitr@gmail.com</p>
               <p><strong>Web:</strong> https://ziya-baran-akademi.vercel.app</p>
             </div>
           </div>
