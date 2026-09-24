@@ -39,6 +39,7 @@ import {
 import { decodePageTexts } from '@/lib/story-utils';
 import { encodeSetDescription, decodeSetDescription } from '@/lib/set-utils';
 import AdminTestManager from '@/components/admin/AdminTestManager';
+import AdminAiPracticeManager from '@/components/admin/AdminAiPracticeManager';
 import AdminSettingsManager from '@/components/admin/AdminSettingsManager';
 import AdminLoginGate from '@/components/admin/AdminLoginGate';
 import ShareModal, { ShareItem } from '@/components/admin/ShareModal';
@@ -62,7 +63,7 @@ interface StoryPageInput {
 }
 
 export default function AdminPage() {
-  const [activeTab, setActiveTab] = useState<'library' | 'create-set' | 'story-set' | 'manage-classes' | 'all-sets' | 'stories' | 'tests' | 'settings'>('library');
+  const [activeTab, setActiveTab] = useState<'library' | 'create-set' | 'story-set' | 'manage-classes' | 'all-sets' | 'stories' | 'tests' | 'ai-practice' | 'settings'>('library');
   const [shareItem, setShareItem] = useState<ShareItem | null>(null);
   const [showCreateDropdown, setShowCreateDropdown] = useState(false);
   const [isNotesExpanded, setIsNotesExpanded] = useState(false);
@@ -1700,10 +1701,43 @@ export default function AdminPage() {
                       <p className="text-[11px] text-slate-500">4 şıklı çoktan seçmeli sınav</p>
                     </div>
                   </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActiveTab('ai-practice');
+                      setShowCreateDropdown(false);
+                    }}
+                    className="w-full p-2.5 rounded-xl hover:bg-purple-50 text-left transition flex items-center gap-3 cursor-pointer group"
+                  >
+                    <div className="w-8 h-8 rounded-lg bg-purple-100 text-purple-700 flex items-center justify-center font-bold text-base group-hover:scale-105 transition">
+                      🤖
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold text-slate-900">Niko AI Çeviri & Konuşma</p>
+                      <p className="text-[11px] text-slate-500">Yapay zekalı sesli/yazılı atölye</p>
+                    </div>
+                  </button>
                 </div>
               </>
             )}
           </div>
+
+          {/* Niko AI Quick Access Tab */}
+          <button
+            type="button"
+            onClick={() => {
+              handleCancelEdit();
+              setActiveTab('ai-practice');
+            }}
+            className={`text-xs font-bold px-3.5 py-2.5 rounded-2xl border shadow-2xs flex items-center gap-1.5 transition cursor-pointer ${
+              activeTab === 'ai-practice'
+                ? 'bg-purple-600 text-white border-purple-600 shadow-purple-600/20'
+                : 'text-purple-700 hover:text-purple-800 bg-purple-50 hover:bg-purple-100 border-purple-200'
+            }`}
+          >
+            <span>🤖 Niko AI Atölyesi</span>
+          </button>
 
           {/* Student Page Link */}
           <Link
@@ -1752,6 +1786,7 @@ export default function AdminPage() {
             {activeTab === 'manage-classes' && 'Modül ve Klasör Yönetimi'}
             {activeTab === 'stories' && 'Hikâyeler & E-Book Studio'}
             {activeTab === 'tests' && 'İnteraktif Testler'}
+            {activeTab === 'ai-practice' && '🤖 Niko AI Çeviri & Konuşma Atölyesi'}
             {activeTab === 'all-sets' && 'Tüm Setler'}
             {activeTab === 'settings' && 'Şifre & Güvenlik'}
           </span>
@@ -4215,6 +4250,13 @@ export default function AdminPage() {
           onRefresh={loadHierarchy}
           showToast={showToast}
         />
+      )}
+
+      {/* ================================================================= */}
+      {/* TAB: NIKO AI ÇEVİRİ & KONUŞMA ATÖLYESİ                            */}
+      {/* ================================================================= */}
+      {activeTab === 'ai-practice' && (
+        <AdminAiPracticeManager showToast={showToast} />
       )}
 
       {/* ================================================================= */}
