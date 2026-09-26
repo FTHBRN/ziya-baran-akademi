@@ -66,29 +66,33 @@ export async function GET(req: NextRequest) {
           .eq('slug', slug)
           .single();
 
-        if (tErr || !test) {
-          return NextResponse.json({ error: 'Test bulunamadı.' }, { status: 404 });
+        if (!tErr && test) {
+          const { data: items } = await supabase
+            .from('ai_practice_items')
+            .select('*')
+            .eq('test_id', test.id)
+            .order('order_index', { ascending: true });
+
+          return NextResponse.json({
+            test: {
+              ...test,
+              items: items || [],
+            },
+          });
         }
-
-        const { data: items } = await supabase
-          .from('ai_practice_items')
-          .select('*')
-          .eq('test_id', test.id)
-          .order('order_index', { ascending: true });
-
-        return NextResponse.json({
-          test: {
-            ...test,
-            items: items || [],
-          },
-        });
       } else {
-        const { data: tests, error } = await supabase
+        const { data: tests, error: tErr } = await supabase
           .from('ai_practice_tests')
           .select('*, items:ai_practice_items(count)')
           .order('created_at', { ascending: false });
 
-        return NextResponse.json({ tests: tests || [] });
+        if (!tErr && tests && tests.length > 0) {
+          // Merge with local tests ensuring no duplicates
+          const localTests = getLocalTests();
+          const dbSlugs = new Set(tests.map((t: any) => t.slug));
+          const combined = [...tests, ...localTests.filter((lt: any) => !dbSlugs.has(lt.slug))];
+          return NextResponse.json({ tests: combined });
+        }
       }
     } catch (e: any) {
       console.warn('Supabase query error, falling back to local JSON:', e.message);

@@ -1,5 +1,155 @@
 [
   {
+    "id": "test-karma-gramer-1",
+    "title": "Temel Gramer Karma Atölye: Past, Will, Should & Can",
+    "slug": "karma-gramer-atolyesi-1",
+    "description": "20 cümlelik pratik: Geçmiş Zaman (Past), Gelecek Zaman (Will), Tavsiye (Should) ve Yetenek (Can) yapıları.",
+    "is_active": true,
+    "created_at": "2026-09-26T17:30:00.000Z",
+    "items": [
+      {
+        "id": "kg-item-1",
+        "order_index": 1,
+        "turkish_sentence": "Dün akşam arkadaşlarımla kahve içtik.",
+        "target_hint": "Past Simple | drink -> drank veya have -> had coffee",
+        "image_url": "https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb?w=600&auto=format&fit=crop"
+      },
+      {
+        "id": "kg-item-2",
+        "order_index": 2,
+        "turkish_sentence": "Geçen pazar günü odamı temizledim.",
+        "target_hint": "Past Simple | clean -> cleaned my room, last Sunday",
+        "image_url": "https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=600&auto=format&fit=crop"
+      },
+      {
+        "id": "kg-item-3",
+        "order_index": 3,
+        "turkish_sentence": "Geçen ay yeni bir bilgisayar satın aldım.",
+        "target_hint": "Past Simple | buy -> bought a new computer, last month",
+        "image_url": "https://images.unsplash.com/photo-1517694712202-14dd9538aa97?w=600&auto=format&fit=crop"
+      },
+      {
+        "id": "kg-item-4",
+        "order_index": 4,
+        "turkish_sentence": "Dün gece televizyon izlemedim, erken uyudum.",
+        "target_hint": "Past Simple (Olumsuz & Olumlu) | didn't watch TV, slept early / went to bed early",
+        "image_url": ""
+      },
+      {
+        "id": "kg-item-5",
+        "order_index": 5,
+        "turkish_sentence": "Geçen hafta sonu müzeyi ziyaret ettik.",
+        "target_hint": "Past Simple | visit -> visited the museum, last weekend",
+        "image_url": "https://images.unsplash.com/photo-1566127444979-b3d2b654e3d7?w=600&auto=format&fit=crop"
+      },
+      {
+        "id": "kg-item-6",
+        "order_index": 6,
+        "turkish_sentence": "Yarın sabah sana e-posta göndereceğim.",
+        "target_hint": "Future (Will) | will send you an email, tomorrow morning",
+        "image_url": ""
+      },
+      {
+        "id": "kg-item-7",
+        "order_index": 7,
+        "turkish_sentence": "Gelecek hafta İstanbul'a seyahat edeceğim.",
+        "target_hint": "Future (Will) | will travel / will go to Istanbul, next week",
+        "image_url": "https://images.unsplash.com/photo-1524231757912-21f4fe3a7200?w=600&auto=format&fit=crop"
+      },
+      {
+        "id": "kg-item-8",
+        "order_index": 8,
+        "turkish_sentence": "Sana yardım edeceğim, merak etme.",
+        "target_hint": "Future (Will) | will help you, don't worry",
+        "image_url": ""
+      },
+      {
+        "id": "kg-item-9",
+        "order_index": 9,
+        "turkish_sentence": "Toplantı saat ikide başlayacak.",
+        "target_hint": "Future (Will) | the meeting will start / begin at two o'clock",
+        "image_url": "https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?w=600&auto=format&fit=crop"
+      },
+      {
+        "id": "kg-item-10",
+        "order_index": 10,
+        "turkish_sentence": "Bu akşam dışarıda yemek yiyeceğiz.",
+        "target_hint": "Future (Will) | will eat out / will have dinner outside this evening",
+        "image_url": "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=600&auto=format&fit=crop"
+      },
+      {
+        "id": "kg-item-11",
+        "order_index": 11,
+        "turkish_sentence": "Her gün daha fazla su içmelisin.",
+        "target_hint": "Tavsiye (Should) | you should drink more water every day",
+        "image_url": "https://images.unsplash.com/photo-1548839140-29a749e1bc4e?w=600&auto=format&fit=crop"
+      },
+      {
+        "id": "kg-item-12",
+        "order_index": 12,
+        "turkish_sentence": "İngilizce öğrenmek için düzenli pratik yapmalısın.",
+        "target_hint": "Tavsiye (Should) | should practice regularly to learn English",
+        "image_url": ""
+      },
+      {
+        "id": "kg-item-13",
+        "order_index": 13,
+        "turkish_sentence": "Çok yorgun görünüyorsun, biraz dinlenmelisin.",
+        "target_hint": "Tavsiye (Should) | you look very tired, you should rest / take some rest",
+        "image_url": "https://images.unsplash.com/photo-1518495973542-4542c06a5843?w=600&auto=format&fit=crop"
+      },
+      {
+        "id": "kg-item-14",
+        "order_index": 14,
+        "turkish_sentence": "Bu kadar geç saatte kahve içmemelisin.",
+        "target_hint": "Tavsiye (Should not) | you shouldn't drink coffee this late",
+        "image_url": ""
+      },
+      {
+        "id": "kg-item-15",
+        "order_index": 15,
+        "turkish_sentence": "Bence bir doktora görünmelisin.",
+        "target_hint": "Tavsiye (Should) | I think you should see a doctor / visit a doctor",
+        "image_url": ""
+      },
+      {
+        "id": "kg-item-16",
+        "order_index": 16,
+        "turkish_sentence": "Ben çok iyi yüzebilirim.",
+        "target_hint": "Yetenek (Can) | I can swim very well",
+        "image_url": "https://images.unsplash.com/photo-1530549387789-4c1017266635?w=600&auto=format&fit=crop"
+      },
+      {
+        "id": "kg-item-17",
+        "order_index": 17,
+        "turkish_sentence": "Bana tuzu uzatabilir misin lütfen?",
+        "target_hint": "Rica (Can) | Can you pass me the salt, please?",
+        "image_url": ""
+      },
+      {
+        "id": "kg-item-18",
+        "order_index": 18,
+        "turkish_sentence": "Burada çok rahat İngilizce konuşabiliriz.",
+        "target_hint": "İmkân (Can) | We can speak English comfortably here",
+        "image_url": ""
+      },
+      {
+        "id": "kg-item-19",
+        "order_index": 19,
+        "turkish_sentence": "Bu problemi kolayca çözebilirim.",
+        "target_hint": "Yetenek (Can) | I can solve this problem easily",
+        "image_url": ""
+      },
+      {
+        "id": "kg-item-20",
+        "order_index": 20,
+        "turkish_sentence": "Yarın seninle sinemaya gelebilirim.",
+        "target_hint": "İmkân (Can) | I can come to the cinema with you tomorrow",
+        "image_url": "https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=600&auto=format&fit=crop"
+      }
+    ]
+  },
+  {
     "id": "sample-daily-past-1",
     "title": "A1/A2 - Günlük Hayat & Geçmiş Zaman",
     "slug": "gunluk-hayat-gecmis-zaman-1",
