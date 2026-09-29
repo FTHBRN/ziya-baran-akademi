@@ -6,6 +6,7 @@ export interface ModuleMetadata {
   icon: string;
   theme: ModuleTheme;
   tagline?: string;
+  isUnlisted?: boolean;
 }
 
 export const MODULE_THEMES: Record<
@@ -132,6 +133,7 @@ export function decodeModuleMetadata(
         icon: parsed.icon || MODULE_THEMES[theme].defaultIcon,
         theme,
         tagline: parsed.tagline || MODULE_THEMES[theme].subIllustration,
+        isUnlisted: !!parsed.isUnlisted,
       };
     } catch {
       // JSON parse failed, fall through to plain string
@@ -151,6 +153,7 @@ export function decodeModuleMetadata(
     icon: MODULE_THEMES[fallbackTheme].defaultIcon,
     theme: fallbackTheme,
     tagline: MODULE_THEMES[fallbackTheme].subIllustration,
+    isUnlisted: false,
   };
 }
 
@@ -164,5 +167,6 @@ export function encodeModuleMetadata(meta: Partial<ModuleMetadata>): string {
     icon: (meta.icon || '📖').trim(),
     theme: meta.theme || 'amber',
     tagline: (meta.tagline || '').trim(),
+    isUnlisted: !!meta.isUnlisted,
   });
 }

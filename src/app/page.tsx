@@ -22,18 +22,26 @@ export default function HomePage() {
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Filter modules for search
-  const filteredModules = useMemo(() => {
-    if (!searchQuery.trim()) return modules;
-    const q = searchQuery.toLowerCase().trim();
+  // Only public modules (not unlisted) are shown on the student home page
+  const publicModules = useMemo(() => {
     return modules.filter((m) => {
+      const meta = decodeModuleMetadata(m.description, m.order_index || 0, m.name);
+      return !meta.isUnlisted;
+    });
+  }, [modules]);
+
+  // Filter modules for search (only among public modules)
+  const filteredModules = useMemo(() => {
+    if (!searchQuery.trim()) return publicModules;
+    const q = searchQuery.toLowerCase().trim();
+    return publicModules.filter((m) => {
       const meta = decodeModuleMetadata(m.description, m.order_index || 0, m.name);
       return (
         m.name.toLowerCase().includes(q) ||
         meta.description.toLowerCase().includes(q)
       );
     });
-  }, [modules, searchQuery]);
+  }, [publicModules, searchQuery]);
 
   return (
     <div className="select-none pb-8 sm:pb-12">

@@ -35,6 +35,8 @@ import {
   KeyRound,
   LogOut,
   Share2,
+  Eye,
+  EyeOff,
 } from 'lucide-react';
 import { decodePageTexts } from '@/lib/story-utils';
 import { encodeSetDescription, decodeSetDescription } from '@/lib/set-utils';
@@ -189,6 +191,7 @@ export default function AdminPage() {
   const [newModuleBadge, setNewModuleBadge] = useState('Story');
   const [newModuleTheme, setNewModuleTheme] = useState<ModuleTheme>('amber');
   const [newModuleIcon, setNewModuleIcon] = useState('📖');
+  const [newModuleIsUnlisted, setNewModuleIsUnlisted] = useState(false);
   const [newFolderClassName, setNewFolderClassName] = useState('');
   const [newFolderName, setNewFolderName] = useState('');
   const [isCreatingClass, setIsCreatingClass] = useState(false);
@@ -208,6 +211,7 @@ export default function AdminPage() {
   const [editModuleBadge, setEditModuleBadge] = useState('Story');
   const [editModuleTheme, setEditModuleTheme] = useState<ModuleTheme>('amber');
   const [editModuleIcon, setEditModuleIcon] = useState('📖');
+  const [editModuleIsUnlisted, setEditModuleIsUnlisted] = useState(false);
   const [isSavingModule, setIsSavingModule] = useState(false);
 
   const [isAdminAuthed, setIsAdminAuthed] = useState<boolean | null>(null);
@@ -1026,6 +1030,7 @@ export default function AdminPage() {
         badge: newModuleBadge,
         theme: newModuleTheme,
         icon: newModuleIcon,
+        isUnlisted: newModuleIsUnlisted,
       });
 
       const res = await fetch('/api/admin/classes', {
@@ -1042,6 +1047,7 @@ export default function AdminPage() {
         showToast(`"${newClassName}" modülü başarıyla oluşturuldu!`);
         setNewClassName('');
         setNewModuleDesc('');
+        setNewModuleIsUnlisted(false);
         loadHierarchy();
       } else {
         showToast('Hata: ' + data.error, 'error');
@@ -1050,6 +1056,50 @@ export default function AdminPage() {
       showToast(err.message, 'error');
     } finally {
       setIsCreatingClass(false);
+    }
+  };
+
+  const copyToClipboard = (text: string, label: string) => {
+    if (typeof navigator !== 'undefined' && navigator.clipboard) {
+      navigator.clipboard.writeText(text);
+      showToast(`${label} kopyalandı!`);
+    } else {
+      showToast('Kopyalama desteklenmiyor', 'error');
+    }
+  };
+
+  const handleToggleModuleVisibility = async (m: any) => {
+    try {
+      const meta = decodeModuleMetadata(m.description, m.order_index || 0, m.name);
+      const newUnlisted = !meta.isUnlisted;
+      const encodedDesc = encodeModuleMetadata({
+        ...meta,
+        isUnlisted: newUnlisted,
+      });
+
+      const res = await fetch('/api/admin/classes', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: m.id,
+          name: m.name,
+          description: encodedDesc,
+        }),
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        showToast(
+          newUnlisted
+            ? `"${m.name}" artık Liste Dışı! (Anasayfada gizli, sadece linkle açılır)`
+            : `"${m.name}" artık Herkese Açık!`
+        );
+        loadHierarchy();
+      } else {
+        showToast('Hata: ' + data.error, 'error');
+      }
+    } catch (err: any) {
+      showToast(err.message, 'error');
     }
   };
 
@@ -1124,6 +1174,7 @@ export default function AdminPage() {
     setEditModuleBadge(meta.badge);
     setEditModuleTheme(meta.theme);
     setEditModuleIcon(meta.icon);
+    setEditModuleIsUnlisted(!!meta.isUnlisted);
   };
 
   const handleSaveModuleEdit = async (e: React.FormEvent) => {
@@ -1137,6 +1188,7 @@ export default function AdminPage() {
         badge: editModuleBadge,
         theme: editModuleTheme,
         icon: editModuleIcon,
+        isUnlisted: editModuleIsUnlisted,
       });
 
       const res = await fetch('/api/admin/classes', {
@@ -3146,6 +3198,27 @@ export default function AdminPage() {
                     </div>
                   </div>
 
+                  {/* Unlisted (Liste Dışı) Checkbox */}
+                  <div className="pt-1">
+                    <label className="flex items-start gap-2.5 p-3 rounded-xl border border-slate-200 bg-slate-50 cursor-pointer hover:bg-slate-100/70 transition-colors">
+                      <input
+                        type="checkbox"
+                        checked={editModuleIsUnlisted}
+                        onChange={(e) => setEditModuleIsUnlisted(e.target.checked)}
+                        className="mt-0.5 rounded text-brand-600 focus:ring-brand-500 w-4 h-4 cursor-pointer"
+                      />
+                      <div>
+                        <span className="block text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                          <EyeOff className="w-3.5 h-3.5 text-amber-600" />
+                          <span>Liste Dışı (Gizli Modül)</span>
+                        </span>
+                        <span className="block text-[11px] text-slate-500 font-normal mt-0.5">
+                          İşaretlenirse bu modül ana sayfada görünmez ve aramalarda çıkmaz. Yalnızca doğrudan linki paylaştığınız öğrenciler erişebilir (YouTube Liste Dışı gibi).
+                        </span>
+                      </div>
+                    </label>
+                  </div>
+
                   <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
                     <button
                       type="button"
@@ -3257,6 +3330,27 @@ export default function AdminPage() {
                   </div>
                 </div>
 
+                {/* Unlisted (Liste Dışı) Checkbox */}
+                <div>
+                  <label className="flex items-start gap-2.5 p-3 rounded-xl border border-slate-200 bg-slate-50 cursor-pointer hover:bg-slate-100/70 transition-colors">
+                    <input
+                      type="checkbox"
+                      checked={newModuleIsUnlisted}
+                      onChange={(e) => setNewModuleIsUnlisted(e.target.checked)}
+                      className="mt-0.5 rounded text-brand-600 focus:ring-brand-500 w-4 h-4 cursor-pointer"
+                    />
+                    <div>
+                      <span className="block text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                        <EyeOff className="w-3.5 h-3.5 text-amber-600" />
+                        <span>Liste Dışı Oluştur (Gizli)</span>
+                      </span>
+                      <span className="block text-[11px] text-slate-500 font-normal mt-0.5">
+                        Ana sayfada gizlensin, sadece doğrudan linkini paylaştığım kişiler görsün.
+                      </span>
+                    </div>
+                  </label>
+                </div>
+
                 <button
                   type="submit"
                   disabled={isCreatingClass}
@@ -3352,8 +3446,19 @@ export default function AdminPage() {
                         <span className="text-2xl">{meta.icon}</span>
 
                         <div>
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2 flex-wrap">
                             <span className="font-black text-slate-900 text-base">{c.name}</span>
+                            {meta.isUnlisted ? (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-100 text-amber-800 border border-amber-300 shadow-2xs">
+                                <EyeOff className="w-3 h-3 text-amber-700" />
+                                <span>Liste Dışı (Gizli)</span>
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300 shadow-2xs">
+                                <Eye className="w-3 h-3 text-emerald-700" />
+                                <span>Herkese Açık</span>
+                              </span>
+                            )}
                           </div>
                           {meta.description && (
                             <p className="text-xs text-slate-600 font-medium line-clamp-1">{meta.description}</p>
@@ -3361,8 +3466,34 @@ export default function AdminPage() {
                         </div>
                       </div>
 
-                      {/* Controls: Reorder Up/Down, Edit, Delete, Quick Create */}
+                      {/* Controls: Copy Link, Toggle Visibility, Reorder Up/Down, Edit, Delete */}
                       <div className="flex items-center gap-1.5 shrink-0 flex-wrap">
+                        {/* Copy Direct Link */}
+                        <button
+                          type="button"
+                          onClick={() => copyToClipboard(`https://ziya-baran-akademi.vercel.app/module/${c.slug}`, 'Modül linki')}
+                          className="px-2.5 py-1.5 rounded-xl bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 shadow-2xs flex items-center gap-1 text-xs font-bold transition-all"
+                          title="Öğrenci Doğrudan Linkini Kopyala"
+                        >
+                          <Copy className="w-3.5 h-3.5 text-brand-600" />
+                          <span className="hidden sm:inline">Linki Kopyala</span>
+                        </button>
+
+                        {/* Quick Visibility Toggle (Public / Unlisted) */}
+                        <button
+                          type="button"
+                          onClick={() => handleToggleModuleVisibility(c)}
+                          className={`px-2.5 py-1.5 rounded-xl border text-xs font-bold shadow-2xs flex items-center gap-1.5 transition-all ${
+                            meta.isUnlisted
+                              ? 'bg-amber-50 border-amber-300 text-amber-800 hover:bg-amber-100'
+                              : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+                          }`}
+                          title={meta.isUnlisted ? 'Tıkla: Modülü Herkese Açık Yap' : 'Tıkla: Modülü Liste Dışı (Gizli) Yap'}
+                        >
+                          {meta.isUnlisted ? <EyeOff className="w-3.5 h-3.5 text-amber-600" /> : <Eye className="w-3.5 h-3.5 text-emerald-600" />}
+                          <span className="hidden sm:inline">{meta.isUnlisted ? 'Liste Dışı' : 'Açık'}</span>
+                        </button>
+
                         {/* Up button */}
                         <button
                           type="button"
