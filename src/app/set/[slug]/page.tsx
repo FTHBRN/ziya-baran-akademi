@@ -483,7 +483,7 @@ export default function SetDetailPage() {
           <h1 className="text-sm sm:text-base font-black text-slate-900 truncate tracking-tight">
             {setInfo.title}
           </h1>
-          {storyMeta?.subtitle && (
+          {storyMeta?.subtitle && storyMeta.subtitle !== setInfo.title && (
             <p className="text-xs text-brand-600 font-bold truncate">
               {storyMeta.subtitle}
             </p>
@@ -493,7 +493,9 @@ export default function SetDetailPage() {
         {/* Right: Card Counter */}
         <div className="flex items-center shrink-0">
           <span className="text-xs font-bold text-slate-700 bg-white border border-slate-200 px-2.5 py-1.5 rounded-xl shadow-2xs">
-            {storyMeta?.isStory ? `${cards.length} Cümle` : `${cardIndex + 1} / ${cards.length}`}
+            {storyMeta?.isStory
+              ? `${cards.length} ${setInfo?.title?.toLowerCase().includes('kelime') ? 'Kelime' : 'Cümle'}`
+              : `${cardIndex + 1} / ${cards.length}`}
           </span>
         </div>
       </div>
@@ -566,7 +568,9 @@ export default function SetDetailPage() {
                 : 'text-slate-600 hover:text-slate-900 font-medium'
             }`}
           >
-            📖 Hikaye
+            {setInfo?.title?.toLowerCase().includes('story') || setInfo?.title?.toLowerCase().includes('hikaye')
+              ? '📖 Hikaye'
+              : '📋 Liste'}
           </button>
         )}
         <button
