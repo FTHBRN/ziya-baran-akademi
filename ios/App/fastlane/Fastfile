@@ -39,7 +39,16 @@ platform :ios do
       app_identifier: "com.ziyabaran.akademi"
     )
 
-    # 3. Build & Archive using gym
+    # 3. Update Xcode Project Signing to Manual with Downloaded Profile
+    update_code_signing_settings(
+      use_automatic_signing: false,
+      path: "App.xcodeproj",
+      profile_name: ENV["SIGH_NAME"],
+      code_sign_identity: "Apple Distribution",
+      bundle_identifier: "com.ziyabaran.akademi"
+    )
+
+    # 4. Build & Archive using gym
     build_app(
       scheme: "App",
       project: "App.xcodeproj",
@@ -50,7 +59,7 @@ platform :ios do
       export_options: {
         signingStyle: "manual",
         provisioningProfiles: {
-          "com.ziyabaran.akademi" => ENV["SIGH_PROFILE_NAME"] || "com.ziyabaran.akademi AppStore"
+          "com.ziyabaran.akademi" => ENV["SIGH_NAME"]
         }
       }
     )
