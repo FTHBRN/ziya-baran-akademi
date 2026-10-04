@@ -27,10 +27,9 @@ platform :ios do
       lock_when_sleeps: false
     )
 
-    # 1. Certificate (Apple Distribution)
+    # 1. Certificate (Apple Distribution - default)
     get_certificates(
       api_key: api_key,
-      type: "distribution",
       keychain_path: File.expand_path("~/Library/Keychains/#{keychain_name}-db")
     )
 
