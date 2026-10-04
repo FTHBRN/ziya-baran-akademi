@@ -20,8 +20,10 @@ export async function POST(request: Request) {
 
     const pdfBuffer = Buffer.from(await file.arrayBuffer());
     
-    // Dynamic import of pdfjs-dist legacy build
+    // Dynamic import of pdfjs-dist legacy build and its worker
     const pdfjs = await import('pdfjs-dist/legacy/build/pdf.js');
+    // @ts-ignore
+    await import('pdfjs-dist/legacy/build/pdf.worker.js');
 
     const doc = await pdfjs.getDocument({
       data: new Uint8Array(pdfBuffer),
