@@ -33,11 +33,10 @@ platform :ios do
       keychain_path: File.expand_path("~/Library/Keychains/#{keychain_name}-db")
     )
 
-    # 2. Provisioning Profile (App Store)
+    # 2. Provisioning Profile (App Store - default)
     get_provisioning_profile(
       api_key: api_key,
-      app_identifier: "com.ziyabaran.akademi",
-      type: "app-store"
+      app_identifier: "com.ziyabaran.akademi"
     )
 
     # 3. Build & Archive using gym
