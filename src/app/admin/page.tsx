@@ -95,6 +95,8 @@ export default function AdminPage() {
   const [uploadingPageImgIndex, setUploadingPageImgIndex] = useState<number | null>(null);
   const [uploadingPageAudioIndex, setUploadingPageAudioIndex] = useState<number | null>(null);
   const [uploadingCover, setUploadingCover] = useState(false);
+  const [isParsingPdf, setIsParsingPdf] = useState(false);
+  const [pdfParseStatus, setPdfParseStatus] = useState<string>('');
 
   // Story Set (10 Cümlelik Kısa Hikaye) Form State
   const [storySetTitle, setStorySetTitle] = useState('');
@@ -1375,6 +1377,51 @@ export default function AdminPage() {
     updated[index] = updated[targetIndex];
     updated[targetIndex] = temp;
     setStoryPages(updated);
+  };
+
+  const handleUploadPdfStory = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setIsParsingPdf(true);
+    setPdfParseStatus('PDF taranıyor ve sayfalar ayrıştırılıyor...');
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      setPdfParseStatus('Görseller WebP formatına dönüştürülüp buluta yükleniyor...');
+      const res = await fetch('/api/parse-story-pdf', {
+        method: 'POST',
+        body: formData,
+      });
+      const data = await res.json();
+      if (!res.ok || data.error) {
+        throw new Error(data.error || 'PDF ayrıştırılamadı');
+      }
+
+      if (data.title) {
+        setStoryTitle(data.title);
+      }
+      if (data.cover_image_url && !storyCoverUrl) {
+        setStoryCoverUrl(data.cover_image_url);
+      }
+      if (data.pages && data.pages.length > 0) {
+        setStoryPages(
+          data.pages.map((p: any) => ({
+            english_text: p.english_text || '',
+            turkish_text: p.turkish_text || '',
+            pronunciation: '',
+            image_url: p.image_url || '',
+            audio_url: '',
+          }))
+        );
+        showToast(`🎉 Harika! ${data.pages.length} sayfa metinleri ve görselleriyle içe aktarıldı!`);
+      }
+    } catch (err: any) {
+      showToast('Hata: ' + err.message, 'error');
+    } finally {
+      setIsParsingPdf(false);
+      setPdfParseStatus('');
+      e.target.value = '';
+    }
   };
 
   const handleUploadCover = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -3874,6 +3921,55 @@ export default function AdminPage() {
                 </div>
               )}
 
+              {/* PDF SMART IMPORT DROPZONE */}
+              <div className="bg-gradient-to-br from-purple-50 via-indigo-50/40 to-white rounded-3xl border-2 border-dashed border-purple-300 p-6 sm:p-8 text-center space-y-4 shadow-xs relative overflow-hidden">
+                <div className="w-14 h-14 rounded-2xl bg-purple-600 text-white flex items-center justify-center mx-auto shadow-md shadow-purple-600/20">
+                  {isParsingPdf ? (
+                    <Loader2 className="w-7 h-7 animate-spin" />
+                  ) : (
+                    <Wand2 className="w-7 h-7" />
+                  )}
+                </div>
+
+                <div className="max-w-lg mx-auto space-y-1.5">
+                  <h4 className="font-extrabold text-slate-900 text-base sm:text-lg">
+                    PDF ile Otomatik Hikâye İçe Aktar (Akıllı Çıkarıcı)
+                  </h4>
+                  <p className="text-xs sm:text-sm text-slate-600">
+                    Kodex veya Word'den aldığınız PDF dosyasını yükleyin. Sistem her sayfadaki görseli WebP olarak buluta yükler; İngilizce hikâye paragraflarını ve Türkçe çevirilerini saniyeler içinde otomatik çıkarıp dizer.
+                  </p>
+                </div>
+
+                {isParsingPdf ? (
+                  <div className="space-y-2 max-w-xs mx-auto">
+                    <div className="flex items-center justify-center gap-2 text-xs font-bold text-purple-700">
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>{pdfParseStatus || 'PDF işleniyor...'}</span>
+                    </div>
+                    <div className="w-full bg-purple-200 h-1.5 rounded-full overflow-hidden">
+                      <div className="bg-purple-600 h-full rounded-full animate-pulse w-3/4" />
+                    </div>
+                  </div>
+                ) : (
+                  <div>
+                    <label className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs sm:text-sm shadow-md shadow-purple-600/20 cursor-pointer transition active:scale-95">
+                      <Upload className="w-4 h-4" />
+                      <span>PDF Dosyası Seç (.pdf)</span>
+                      <input
+                        type="file"
+                        accept=".pdf,application/pdf"
+                        onChange={handleUploadPdfStory}
+                        className="hidden"
+                        disabled={isParsingPdf}
+                      />
+                    </label>
+                    <p className="text-[11px] text-slate-400 mt-2 font-medium">
+                      İçe aktarılan tüm sayfaları, metinleri ve görselleri aşağıdan serbestçe manuel düzenleyebilirsiniz.
+                    </p>
+                  </div>
+                )}
+              </div>
+
               {/* Story Editor Form */}
               <form onSubmit={handleSaveStory} className="space-y-6">
                 {/* 1. Header Information */}
@@ -3952,15 +4048,21 @@ export default function AdminPage() {
                       </select>
                     </div>
 
-                    {/* Cover Image Upload / URL */}
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-medium text-slate-600 block">
-                        Kapak Görseli (İsteğe Bağlı)
-                      </label>
+                    {/* Cover Image Upload / URL & WhatsApp Live Card Preview */}
+                    <div className="sm:col-span-3 space-y-2 pt-2 border-t">
+                      <div className="flex items-center justify-between">
+                        <label className="text-xs font-semibold text-slate-700 block">
+                          Kapak Görseli & WhatsApp Önizlemesi (İsteğe Bağlı)
+                        </label>
+                        <span className="text-[11px] text-slate-500 font-normal">
+                          {storyCoverUrl ? 'Özel kapak seçildi' : 'Boş bırakılırsa 1. sayfa görseli kullanılır'}
+                        </span>
+                      </div>
+                      
                       <div className="flex items-center gap-2">
                         <input
                           type="url"
-                          placeholder="Görsel URL veya Yükle"
+                          placeholder="Görsel URL girin veya sağdaki butondan dosya yükleyin"
                           value={storyCoverUrl}
                           onChange={(e) => setStoryCoverUrl(e.target.value)}
                           className="flex-1 px-3 py-2 rounded-xl border border-slate-200 text-xs font-normal text-slate-800 focus:outline-none focus:border-purple-600"
@@ -3976,29 +4078,57 @@ export default function AdminPage() {
                           />
                         </label>
                       </div>
-                    </div>
-                  </div>
 
-                  {/* Cover Preview Thumbnail */}
-                  {storyCoverUrl && (
-                    <div className="flex items-center gap-3 p-2 bg-slate-50 rounded-xl border border-slate-200 w-fit">
-                      <img
-                        src={storyCoverUrl}
-                        alt="Kapak Görseli"
-                        className="w-12 h-12 rounded-lg object-cover border"
-                      />
-                      <div className="text-xs">
-                        <p className="font-semibold text-slate-800">Kapak Görseli Hazır</p>
-                        <button
-                          type="button"
-                          onClick={() => setStoryCoverUrl('')}
-                          className="text-rose-600 hover:underline text-[11px]"
-                        >
-                          Kaldır
-                        </button>
+                      {/* Live WhatsApp Card Preview */}
+                      <div className="p-3.5 rounded-2xl bg-emerald-50/70 border border-emerald-200/80 space-y-2.5">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[11px] font-bold text-emerald-900 flex items-center gap-1.5">
+                            <Send className="w-3.5 h-3.5 text-emerald-600" />
+                            <span>WhatsApp Paylaşım Önizlemesi</span>
+                          </span>
+                          <span className="text-[10px] text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-full font-semibold">
+                            {storyCoverUrl
+                              ? 'Özel Kapak Görseli'
+                              : storyPages[0]?.image_url
+                              ? '1. Sayfa Görseli (Otomatik)'
+                              : 'Varsayılan Logo'}
+                          </span>
+                        </div>
+
+                        <div className="flex items-center gap-3 p-2.5 bg-white rounded-xl border border-emerald-100 shadow-2xs">
+                          <img
+                            src={storyCoverUrl || storyPages[0]?.image_url || '/logo-icon.png'}
+                            alt="WhatsApp Önizleme"
+                            className="w-16 h-16 rounded-lg object-cover border border-slate-100 shrink-0 bg-slate-100"
+                            onError={(e) => {
+                              (e.target as HTMLImageElement).src = '/logo-icon.png';
+                            }}
+                          />
+                          <div className="min-w-0 flex-1">
+                            <p className="text-xs font-bold text-slate-900 truncate">
+                              {storyTitle || 'Hikâye Başlığı'}
+                            </p>
+                            <p className="text-[11px] text-slate-500 truncate">
+                              {storyPages.length} sayfalık sesli ve resimli İngilizce hikâye.
+                            </p>
+                            <p className="text-[10px] text-slate-400 font-mono">
+                              ziya-baran-akademi.vercel.app
+                            </p>
+                          </div>
+                          {storyCoverUrl && (
+                            <button
+                              type="button"
+                              onClick={() => setStoryCoverUrl('')}
+                              className="text-xs text-rose-600 hover:bg-rose-50 px-2.5 py-1 rounded-lg border border-rose-200 shrink-0"
+                              title="Özel kapağı kaldır, 1. sayfayı kullan"
+                            >
+                              Kaldır
+                            </button>
+                          )}
+                        </div>
                       </div>
                     </div>
-                  )}
+                  </div>
                 </div>
 
                 {/* 2. Dynamic Story Pages List */}

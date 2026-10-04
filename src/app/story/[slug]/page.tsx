@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
@@ -65,7 +65,10 @@ export default function StoryReaderPage() {
   const [showTurkish, setShowTurkish] = useState(false);
   const [showPronunciation, setShowPronunciation] = useState(false);
   const [ttsSpeed, setTtsSpeed] = useState<number>(0.9);
+  // Audio Playback & Karaoke Highlighting State
   const [isSpeaking, setIsSpeaking] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
+  const [activeSentenceIndex, setActiveSentenceIndex] = useState<number | null>(null);
   const [isFinished, setIsFinished] = useState(false);
   const [copied, setCopied] = useState(false);
 
@@ -75,6 +78,16 @@ export default function StoryReaderPage() {
   const [isAudioPlaying, setIsAudioPlaying] = useState(false);
 
   const loading = isLoading && !cached?.storyData;
+
+  const currentPage = pages[currentPageIndex];
+
+  // Split english text into readable sentences for interactive highlighting
+  const currentSentences = useMemo(() => {
+    const text = currentPage?.english_text || '';
+    if (!text.trim()) return [];
+    const matches = text.match(/[^.!?]+[.!?]+["'”’]?|[^.!?]+$/g);
+    return matches ? matches.map((s) => s.trim()).filter(Boolean) : [text];
+  }, [currentPage?.english_text]);
 
   useEffect(() => {
     if (cached?.storyData) {
@@ -127,7 +140,7 @@ export default function StoryReaderPage() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [currentPageIndex, pages, isSpeaking]);
+  }, [currentPageIndex, pages, isSpeaking, isPaused, activeSentenceIndex]);
 
   const stopSpeech = () => {
     if (edgeAudioRef.current) {
@@ -137,38 +150,40 @@ export default function StoryReaderPage() {
       window.speechSynthesis.cancel();
     }
     setIsSpeaking(false);
+    setIsPaused(false);
+    setActiveSentenceIndex(null);
   };
 
-  const fallbackStorySpeak = (text: string) => {
-    if (typeof window === 'undefined' || !window.speechSynthesis) {
+  const pauseSpeech = () => {
+    if (edgeAudioRef.current) {
+      edgeAudioRef.current.pause();
+    }
+    if (typeof window !== 'undefined' && window.speechSynthesis) {
+      window.speechSynthesis.cancel();
+    }
+    setIsSpeaking(false);
+    setIsPaused(true);
+  };
+
+  const playSentence = (index: number) => {
+    if (!currentSentences || index >= currentSentences.length || index < 0) {
       setIsSpeaking(false);
+      setIsPaused(false);
+      setActiveSentenceIndex(null);
       return;
     }
-    window.speechSynthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = 'en-US';
-    utterance.rate = ttsSpeed;
-    utterance.onstart = () => setIsSpeaking(true);
-    utterance.onend = () => setIsSpeaking(false);
-    utterance.onerror = () => setIsSpeaking(false);
-    window.speechSynthesis.speak(utterance);
-  };
-
-  const toggleSpeech = () => {
-    if (isSpeaking) {
-      stopSpeech();
-      return;
-    }
-
-    const currentPage = pages[currentPageIndex];
-    if (!currentPage || !currentPage.english_text) return;
 
     if (audioRef.current && isAudioPlaying) {
       audioRef.current.pause();
       setIsAudioPlaying(false);
     }
 
-    const cleanText = currentPage.english_text.trim();
+    setActiveSentenceIndex(index);
+    setIsSpeaking(true);
+    setIsPaused(false);
+
+    const sentenceText = currentSentences[index];
+    if (!sentenceText) return;
 
     try {
       if (typeof window === 'undefined') return;
@@ -178,31 +193,71 @@ export default function StoryReaderPage() {
       const audio = edgeAudioRef.current;
       audio.pause();
 
-      const ttsUrl = `/api/tts?text=${encodeURIComponent(cleanText)}`;
+      const ttsUrl = `/api/tts?text=${encodeURIComponent(sentenceText)}`;
       audio.src = ttsUrl;
       audio.playbackRate = ttsSpeed;
 
-      setIsSpeaking(true);
-
       audio.onended = () => {
-        setIsSpeaking(false);
+        playSentence(index + 1);
       };
 
       audio.onerror = () => {
-        console.warn('Edge TTS failed in story, falling back to Web Speech');
-        fallbackStorySpeak(cleanText);
+        console.warn('Edge TTS failed, fallback to Web Speech');
+        fallbackSentenceSpeak(sentenceText, index);
       };
 
       const playPromise = audio.play();
       if (playPromise !== undefined) {
         playPromise.catch((err) => {
           console.warn('Edge TTS play error, fallback:', err);
-          fallbackStorySpeak(cleanText);
+          fallbackSentenceSpeak(sentenceText, index);
         });
       }
     } catch (e) {
-      fallbackStorySpeak(cleanText);
+      fallbackSentenceSpeak(sentenceText, index);
     }
+  };
+
+  const fallbackSentenceSpeak = (text: string, index: number) => {
+    if (typeof window === 'undefined' || !window.speechSynthesis) {
+      setIsSpeaking(false);
+      return;
+    }
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = 'en-US';
+    utterance.rate = ttsSpeed;
+    utterance.onstart = () => {
+      setIsSpeaking(true);
+      setActiveSentenceIndex(index);
+    };
+    utterance.onend = () => {
+      playSentence(index + 1);
+    };
+    utterance.onerror = () => {
+      setIsSpeaking(false);
+      setActiveSentenceIndex(null);
+    };
+    window.speechSynthesis.speak(utterance);
+  };
+
+  const toggleSpeech = () => {
+    if (isSpeaking) {
+      pauseSpeech();
+      return;
+    }
+
+    if (isPaused && activeSentenceIndex !== null) {
+      playSentence(activeSentenceIndex);
+      return;
+    }
+
+    playSentence(0);
+  };
+
+  const restartSpeech = () => {
+    stopSpeech();
+    playSentence(0);
   };
 
   const toggleCustomAudio = () => {
@@ -278,7 +333,6 @@ export default function StoryReaderPage() {
     );
   }
 
-  const currentPage = pages[currentPageIndex];
   const progressPercent = Math.round(((currentPageIndex + 1) / pages.length) * 100);
 
   // Theme styling definitions
@@ -529,19 +583,46 @@ export default function StoryReaderPage() {
                   </div>
                 )}
 
-                {/* Built-in Text-to-Speech (TTS) */}
+                {/* Built-in Text-to-Speech (TTS) with Play / Pause / Resume */}
                 <button
                   onClick={toggleSpeech}
-                  className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-semibold transition ${
+                  className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-semibold transition shadow-xs ${
                     isSpeaking
-                      ? 'bg-brand-600 text-white shadow-sm shadow-brand-500/30 animate-pulse'
-                      : 'bg-brand-50 text-brand-700 hover:bg-brand-100 border border-brand-200/80'
+                      ? 'bg-amber-500 text-white shadow-amber-500/30'
+                      : isPaused
+                      ? 'bg-emerald-600 text-white shadow-emerald-500/30'
+                      : 'bg-brand-600 text-white shadow-brand-500/30 hover:bg-brand-700'
                   }`}
-                  title="İngilizce Telaffuzu Dinle (TTS)"
+                  title={isSpeaking ? 'Duraklat' : isPaused ? 'Kaldığı Yerden Devam Et' : 'Sesli Dinle'}
                 >
-                  {isSpeaking ? <VolumeX className="w-3.5 h-3.5" /> : <Volume2 className="w-3.5 h-3.5" />}
-                  <span>{isSpeaking ? 'Durdur' : 'Sesli Dinle'}</span>
+                  {isSpeaking ? (
+                    <>
+                      <Pause className="w-3.5 h-3.5" />
+                      <span>Duraklat</span>
+                    </>
+                  ) : isPaused ? (
+                    <>
+                      <Play className="w-3.5 h-3.5" />
+                      <span>Devam Et</span>
+                    </>
+                  ) : (
+                    <>
+                      <Volume2 className="w-3.5 h-3.5" />
+                      <span>Sesli Dinle</span>
+                    </>
+                  )}
                 </button>
+
+                {/* Başa Al (Restart) Button */}
+                {(isSpeaking || isPaused || activeSentenceIndex !== null) && (
+                  <button
+                    onClick={restartSpeech}
+                    className="p-1.5 rounded-xl text-xs font-semibold bg-black/5 hover:bg-black/10 text-slate-700 dark:text-slate-300 transition"
+                    title="Baştan Tekrar Başlat"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5" />
+                  </button>
+                )}
 
                 {/* TTS Speed button */}
                 <button
@@ -554,13 +635,34 @@ export default function StoryReaderPage() {
               </div>
             </div>
 
-            {/* The English Paragraph */}
-            <p
-              className={`font-semibold tracking-tight transition-all duration-150 ${fontSizes[fontSize]} ${
-                isSpeaking ? 'text-brand-600 dark:text-brand-400' : ''
-              }`}
+            {/* The English Paragraph with Interactive Sentence Highlighting */}
+            <div
+              className={`font-semibold tracking-tight transition-all duration-150 ${fontSizes[fontSize]} leading-relaxed`}
             >
-              {currentPage.english_text}
+              {currentSentences.map((sentence, idx) => {
+                const isActive = activeSentenceIndex === idx;
+                return (
+                  <span
+                    key={idx}
+                    onClick={() => playSentence(idx)}
+                    className={`cursor-pointer transition-all duration-200 rounded-lg px-1 py-0.5 inline ${
+                      isActive && isSpeaking
+                        ? 'bg-amber-300 dark:bg-amber-500/50 text-slate-950 dark:text-amber-100 font-bold shadow-xs scale-[1.01]'
+                        : isActive && isPaused
+                        ? 'bg-amber-100 dark:bg-amber-900/40 text-slate-900 dark:text-slate-100 underline decoration-amber-500 decoration-2'
+                        : 'hover:bg-purple-100/70 dark:hover:bg-purple-900/40'
+                    }`}
+                    title="Bu cümleden dinlemeye başla"
+                  >
+                    {sentence}{' '}
+                  </span>
+                );
+              })}
+            </div>
+
+            <p className="text-[11px] opacity-60 flex items-center gap-1.5 pt-1">
+              <span>💡</span>
+              <span>İstediğiniz cümlenin üzerine tıklayarak o cümleden dinlemeye başlayabilirsiniz.</span>
             </p>
           </div>
 
