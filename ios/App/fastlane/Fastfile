@@ -30,8 +30,12 @@ platform :ios do
     # 1. Certificate (Apple Distribution - default)
     get_certificates(
       api_key: api_key,
-      keychain_path: File.expand_path("~/Library/Keychains/#{keychain_name}-db")
+      keychain_path: File.expand_path("~/Library/Keychains/#{keychain_name}-db"),
+      keychain_password: keychain_password
     )
+
+    # Prevent GUI codesign prompts in headless CI
+    sh("security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k #{keychain_password} #{File.expand_path('~/Library/Keychains/' + keychain_name + '-db')}")
 
     # 2. Provisioning Profile (App Store - default)
     get_provisioning_profile(
