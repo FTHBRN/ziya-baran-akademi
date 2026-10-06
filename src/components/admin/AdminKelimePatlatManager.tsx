@@ -214,14 +214,24 @@ export default function AdminKelimePatlatManager() {
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <a
             href="/kelime-patlat"
             target="_blank"
             rel="noopener noreferrer"
-            className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-bold text-xs shadow-md shadow-amber-500/20 flex items-center gap-2 transition"
+            className="px-3.5 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-bold text-xs shadow-md shadow-amber-500/20 flex items-center gap-1.5 transition"
           >
-            <span>Oyunu Canlı Test Et</span>
+            <span>💥 Kelime Patlat</span>
+            <ExternalLink className="w-3.5 h-3.5" />
+          </a>
+
+          <a
+            href="/kelime-kosusu"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="px-3.5 py-2.5 rounded-xl bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-600 hover:to-blue-700 text-white font-bold text-xs shadow-md shadow-blue-500/20 flex items-center gap-1.5 transition"
+          >
+            <span>🏃‍♂️ Kelime Koşusu</span>
             <ExternalLink className="w-3.5 h-3.5" />
           </a>
 

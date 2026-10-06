@@ -13,7 +13,8 @@ export default function StudentAuthGate({ children }: { children: React.ReactNod
     pathname?.startsWith('/admin') ||
     pathname?.startsWith('/gizlilik') ||
     pathname?.startsWith('/privacy') ||
-    pathname?.startsWith('/kelime-patlat');
+    pathname?.startsWith('/kelime-patlat') ||
+    pathname?.startsWith('/kelime-kosusu');
 
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
   const [inputCode, setInputCode] = useState('');

@@ -13,7 +13,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     pathname?.startsWith('/set/') ||
     pathname?.startsWith('/test/') ||
     pathname?.startsWith('/story/') ||
-    pathname?.startsWith('/kelime-patlat');
+    pathname?.startsWith('/kelime-patlat') ||
+    pathname?.startsWith('/kelime-kosusu');
 
   return (
     <div className="min-h-screen flex flex-col bg-slate-50 text-slate-900 overflow-x-hidden">
