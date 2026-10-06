@@ -43,6 +43,7 @@ import { encodeSetDescription, decodeSetDescription } from '@/lib/set-utils';
 import AdminTestManager from '@/components/admin/AdminTestManager';
 import AdminAiPracticeManager from '@/components/admin/AdminAiPracticeManager';
 import AdminSettingsManager from '@/components/admin/AdminSettingsManager';
+import AdminKelimePatlatManager from '@/components/admin/AdminKelimePatlatManager';
 import AdminLoginGate from '@/components/admin/AdminLoginGate';
 import ShareModal, { ShareItem } from '@/components/admin/ShareModal';
 import AdminLibraryView from '@/components/admin/AdminLibraryView';
@@ -65,7 +66,7 @@ interface StoryPageInput {
 }
 
 export default function AdminPage() {
-  const [activeTab, setActiveTab] = useState<'library' | 'create-set' | 'story-set' | 'manage-classes' | 'all-sets' | 'stories' | 'tests' | 'ai-practice' | 'settings'>('library');
+  const [activeTab, setActiveTab] = useState<'library' | 'create-set' | 'story-set' | 'manage-classes' | 'all-sets' | 'stories' | 'tests' | 'ai-practice' | 'kelime-patlat' | 'settings'>('library');
   const [shareItem, setShareItem] = useState<ShareItem | null>(null);
   const [showCreateDropdown, setShowCreateDropdown] = useState(false);
   const [isNotesExpanded, setIsNotesExpanded] = useState(false);
@@ -1838,6 +1839,22 @@ export default function AdminPage() {
             <span>🤖 Niko AI Atölyesi</span>
           </button>
 
+          {/* Kelime Patlat Game Manager Tab */}
+          <button
+            type="button"
+            onClick={() => {
+              handleCancelEdit();
+              setActiveTab('kelime-patlat');
+            }}
+            className={`text-xs font-bold px-3.5 py-2.5 rounded-2xl border shadow-2xs flex items-center gap-1.5 transition cursor-pointer ${
+              activeTab === 'kelime-patlat'
+                ? 'bg-amber-500 text-slate-950 border-amber-500 shadow-amber-500/20 font-black'
+                : 'text-amber-800 hover:text-amber-900 bg-amber-50 hover:bg-amber-100 border-amber-200'
+            }`}
+          >
+            <span>💥 Kelime Patlat</span>
+          </button>
+
           {/* Student Page Link */}
           <Link
             href="/"
@@ -1886,6 +1903,7 @@ export default function AdminPage() {
             {activeTab === 'stories' && 'Hikâyeler & E-Book Studio'}
             {activeTab === 'tests' && 'İnteraktif Testler'}
             {activeTab === 'ai-practice' && '🤖 Niko AI Çeviri & Konuşma Atölyesi'}
+            {activeTab === 'kelime-patlat' && '💥 Kelime Patlat Oyun Havuzu'}
             {activeTab === 'all-sets' && 'Tüm Setler'}
             {activeTab === 'settings' && 'Şifre & Güvenlik'}
           </span>
@@ -4519,6 +4537,11 @@ export default function AdminPage() {
       {activeTab === 'ai-practice' && (
         <AdminAiPracticeManager showToast={showToast} />
       )}
+
+      {/* ================================================================= */}
+      {/* TAB: KELİME PATLAT OYUN YÖNETİMİ                                   */}
+      {/* ================================================================= */}
+      {activeTab === 'kelime-patlat' && <AdminKelimePatlatManager />}
 
       {/* ================================================================= */}
       {/* TAB 7: AKADEMİ ŞİFRESİ VE AYARLAR                                 */}

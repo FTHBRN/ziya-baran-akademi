@@ -12,7 +12,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const isStudyMode =
     pathname?.startsWith('/set/') ||
     pathname?.startsWith('/test/') ||
-    pathname?.startsWith('/story/');
+    pathname?.startsWith('/story/') ||
+    pathname?.startsWith('/kelime-patlat');
 
   return (
     <div className="min-h-screen flex flex-col bg-slate-50 text-slate-900 overflow-x-hidden">

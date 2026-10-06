@@ -8,9 +8,6 @@ on:
       - 'android/**'
       - '.github/workflows/build-android.yml'
       - 'capacitor.config.ts'
-      - 'package.json'
-      - 'src/**'
-      - 'public/**'
 
 jobs:
   build:

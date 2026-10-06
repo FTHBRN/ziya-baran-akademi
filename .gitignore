@@ -27,3 +27,7 @@ ios/App/DerivedData/
 
 .vercel
 .env*
+test_fal_*
+scratch_keywords.png
+scratch/
+scripts/

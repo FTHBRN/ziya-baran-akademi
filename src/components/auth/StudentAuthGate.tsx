@@ -12,7 +12,8 @@ export default function StudentAuthGate({ children }: { children: React.ReactNod
   const isExempt =
     pathname?.startsWith('/admin') ||
     pathname?.startsWith('/gizlilik') ||
-    pathname?.startsWith('/privacy');
+    pathname?.startsWith('/privacy') ||
+    pathname?.startsWith('/kelime-patlat');
 
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
   const [inputCode, setInputCode] = useState('');
