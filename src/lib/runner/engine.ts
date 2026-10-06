@@ -22,7 +22,7 @@ export interface CoinObject {
 export interface RoadsideDecor {
   side: -1 | 1; // Left or Right
   z: number;
-  type: 'tree' | 'cone' | 'lamp';
+  type: 'tree' | 'cone' | 'lamp' | 'bus' | 'banner';
 }
 
 export interface RunnerEngineCallbacks {
@@ -97,12 +97,14 @@ export class RunnerEngine {
 
   private initDecorations() {
     this.decorList = [];
-    for (let i = 0; i < 14; i++) {
-      const z = i * 140 + 50;
+    for (let i = 0; i < 16; i++) {
+      const z = i * 120 + 60;
+      const types: ('tree' | 'cone' | 'bus' | 'banner')[] = ['tree', 'tree', 'cone', 'banner', 'tree', 'bus', 'cone', 'banner'];
+      const chosenType = types[i % types.length];
       this.decorList.push({
         side: i % 2 === 0 ? -1 : 1,
         z,
-        type: i % 3 === 0 ? 'cone' : 'tree',
+        type: chosenType,
       });
     }
   }
@@ -223,7 +225,8 @@ export class RunnerEngine {
       d.z -= movement;
       if (d.z <= 0) {
         d.z = 1800 + Math.random() * 200;
-        d.type = Math.random() < 0.4 ? 'cone' : 'tree';
+        const rand = Math.random();
+        d.type = rand < 0.4 ? 'tree' : rand < 0.65 ? 'cone' : rand < 0.85 ? 'banner' : 'bus';
       }
     }
 
@@ -489,6 +492,51 @@ export class RunnerEngine {
         ctx.closePath();
         ctx.fillStyle = '#FFFFFF';
         ctx.fill();
+      } else if (item.type === 'bus') {
+        // Cheerful Yellow School Bus (Parked on roadside like reference image)
+        ctx.fillStyle = '#F59E0B'; // School bus yellow
+        ctx.beginPath();
+        ctx.roundRect(-24, -36, 48, 28, [6, 6, 2, 2]);
+        ctx.fill();
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = '#B45309';
+        ctx.stroke();
+
+        // Windows
+        ctx.fillStyle = '#E0F2FE';
+        ctx.fillRect(-20, -32, 10, 10);
+        ctx.fillRect(-6, -32, 12, 10);
+        ctx.fillRect(10, -32, 10, 10);
+
+        // Black stripe
+        ctx.fillStyle = '#1E293B';
+        ctx.fillRect(-24, -18, 48, 3);
+
+        // Wheels
+        ctx.fillStyle = '#0F172A';
+        ctx.beginPath();
+        ctx.arc(-14, -8, 6, 0, Math.PI * 2);
+        ctx.arc(14, -8, 6, 0, Math.PI * 2);
+        ctx.fill();
+      } else if (item.type === 'banner') {
+        // Colorful Roadside Motivational Banner
+        ctx.fillStyle = '#64748B'; // Banner pole
+        ctx.fillRect(-2, -38, 4, 38);
+
+        // Sign board
+        ctx.beginPath();
+        ctx.roundRect(-22, -38, 44, 20, 4);
+        ctx.fillStyle = item.side === -1 ? '#3B82F6' : '#EC4899';
+        ctx.fill();
+        ctx.lineWidth = 1.5;
+        ctx.strokeStyle = '#FFFFFF';
+        ctx.stroke();
+
+        ctx.fillStyle = '#FFFFFF';
+        ctx.font = 'bold 9px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(item.side === -1 ? 'HIZLAN!' : 'KOŞ!', 0, -28);
       } else {
         // Bushy tree
         ctx.fillStyle = '#854D0E';
@@ -556,10 +604,8 @@ export class RunnerEngine {
     const curveT = t * t;
     const y = vY + (h - vY) * curveT;
     const currentRoadW = topW + (bottomW - topW) * curveT;
-    const scale = Math.max(0.18 + curveT * 1.05, 0.05);
-
-    const gateWidth = (currentRoadW / 3) * 0.96;
-    const gateHeight = gateWidth * 1.25;
+    // Scale curve: make it visible and legible earlier
+    const scale = Math.max(0.24 + curveT * 1.15, 0.08);
 
     // Render 3 Gates in lanes: Left (-1), Center (0), Right (1)
     currentQ.options.forEach((opt) => {
@@ -570,57 +616,80 @@ export class RunnerEngine {
       ctx.translate(x, y);
       ctx.scale(scale, scale);
 
-      // Gate Arch Dimensions
-      const gw = 100;
-      const gh = 130;
+      // Gate Arch Dimensions - Enlarged for massive readability
+      const gw = 138;
+      const gh = 175;
 
-      // Glowing Aura for Correct Gate
+      // Road chevron arrows on the ground in front of the gate
       if (opt.isCorrect) {
-        ctx.shadowColor = '#22C55E';
-        ctx.shadowBlur = 20 * scale;
+        // High visibility bright neon green guidance arrows on asphalt
+        ctx.fillStyle = '#4ADE80';
+        for (let arr = 0; arr < 3; arr++) {
+          const arrY = 15 + arr * 22;
+          ctx.beginPath();
+          ctx.moveTo(0, arrY);
+          ctx.lineTo(-18, arrY + 16);
+          ctx.lineTo(-8, arrY + 16);
+          ctx.lineTo(0, arrY + 8);
+          ctx.lineTo(8, arrY + 16);
+          ctx.lineTo(18, arrY + 16);
+          ctx.closePath();
+          ctx.fill();
+        }
       }
 
-      // Arch outer body
+      // Arch Outer Glowing Border for Correct Gate
+      if (opt.isCorrect) {
+        ctx.shadowColor = '#22C55E';
+        ctx.shadowBlur = 24 * scale;
+      }
+
+      // 1. Arch Outer Pillar Frame
       ctx.beginPath();
-      ctx.roundRect(-gw / 2, -gh, gw, gh, [20, 20, 0, 0]);
-      ctx.fillStyle = opt.color; // e.g. #E11D48, #22C55E, #0284C7
+      ctx.roundRect(-gw / 2, -gh, gw, gh, [24, 24, 4, 4]);
+      ctx.fillStyle = opt.color; // Vibrant gate color
       ctx.fill();
-      ctx.lineWidth = 5;
+      ctx.lineWidth = 6;
       ctx.strokeStyle = '#FFFFFF';
       ctx.stroke();
 
       ctx.shadowBlur = 0; // reset shadow
 
-      // Arch Portal inner cutout (tunnel through which player runs)
+      // 2. Arch Inner Tunnel Opening
       ctx.beginPath();
-      ctx.roundRect(-gw * 0.38, -gh * 0.75, gw * 0.76, gh * 0.75, [14, 14, 0, 0]);
-      ctx.fillStyle = 'rgba(15, 23, 42, 0.6)';
+      ctx.roundRect(-gw * 0.4, -gh * 0.68, gw * 0.8, gh * 0.68, [16, 16, 0, 0]);
+      ctx.fillStyle = 'rgba(15, 23, 42, 0.72)';
       ctx.fill();
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+      ctx.stroke();
 
-      // Top Header Text (The English Word e.g. "SCHOOL", "HOUSE", "STORY")
+      // 3. Prominent Top Header Word Banner (White badge for supreme contrast)
+      const bannerW = gw * 0.94;
+      const bannerH = 46;
+      const bannerY = -gh + 6;
+
+      ctx.beginPath();
+      ctx.roundRect(-bannerW / 2, bannerY, bannerW, bannerH, 10);
       ctx.fillStyle = '#FFFFFF';
-      ctx.font = '900 18px system-ui, sans-serif';
+      ctx.fill();
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = opt.color;
+      ctx.stroke();
+
+      // 4. Large Bold English Word Text
+      ctx.fillStyle = '#0F172A';
+      // Dynamically fit font size if word is long
+      const textLen = opt.text.length;
+      const fontSize = textLen > 9 ? 20 : textLen > 7 ? 23 : 26;
+      ctx.font = `900 ${fontSize}px system-ui, -apple-system, sans-serif`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillText(opt.text, 0, -gh + 18);
+      ctx.fillText(opt.text, 0, bannerY + bannerH / 2);
 
-      // Center Icon (House, School, Book)
-      ctx.font = '24px sans-serif';
-      ctx.fillText(opt.isCorrect ? '🏫' : opt.lane === -1 ? '🏠' : '📖', 0, -gh * 0.42);
-
-      // Road chevron arrows on the ground in front of correct gate
-      if (opt.isCorrect) {
-        ctx.fillStyle = '#86EFAC';
-        ctx.beginPath();
-        ctx.moveTo(0, 10);
-        ctx.lineTo(-12, 24);
-        ctx.lineTo(-6, 24);
-        ctx.lineTo(0, 18);
-        ctx.lineTo(6, 24);
-        ctx.lineTo(12, 24);
-        ctx.closePath();
-        ctx.fill();
-      }
+      // 5. Center Icon (Building / House / Book badge inside tunnel)
+      ctx.font = '28px sans-serif';
+      ctx.fillText(opt.isCorrect ? '🏫' : opt.lane === -1 ? '🏠' : '📖', 0, -gh * 0.36);
 
       ctx.restore();
     });

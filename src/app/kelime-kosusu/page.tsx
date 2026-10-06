@@ -29,6 +29,7 @@ import {
   playFeverModeSound,
   playErrorSound,
   playGameOverSound,
+  playCoinSound,
   getSoundMuted,
   setSoundMuted,
 } from '@/lib/sound-effects';
@@ -171,7 +172,7 @@ export default function KelimeKosusuPage() {
 
     const questions = prepareQuestions();
 
-    // Set first question on top banner
+    // Set first question on top banner (Do NOT auto-speak to prevent answer spoiler!)
     if (questions.length > 0) {
       setActiveQuestion({
         turkishWord: questions[0].turkishWord,
@@ -179,7 +180,6 @@ export default function KelimeKosusuPage() {
         questionNumber: 1,
         totalQuestions: 10,
       });
-      speakWord(questions[0].englishCorrect);
     }
 
     // Initialize Canvas Engine after DOM update
@@ -197,6 +197,12 @@ export default function KelimeKosusuPage() {
         onCorrectGate: (qIndex, basePoints) => {
           triggerHaptic('heavy');
           playMatchSound();
+
+          // Pronounce the correct word NOW that the player picked it!
+          const answeredQ = questions[qIndex];
+          if (answeredQ) {
+            setTimeout(() => speakWord(answeredQ.englishCorrect), 50);
+          }
 
           setCorrectCount((c) => c + 1);
           setStreak((prevStreak) => {
@@ -225,7 +231,7 @@ export default function KelimeKosusuPage() {
             return nextStreak;
           });
 
-          // Update active question for next gate
+          // Update active question for next gate (do not speak next question yet!)
           if (qIndex + 1 < questions.length) {
             const nextQ = questions[qIndex + 1];
             setActiveQuestion({
@@ -234,7 +240,6 @@ export default function KelimeKosusuPage() {
               questionNumber: qIndex + 2,
               totalQuestions: 10,
             });
-            setTimeout(() => speakWord(nextQ.englishCorrect), 400);
           }
         },
 
@@ -269,7 +274,7 @@ export default function KelimeKosusuPage() {
 
         onCoinCollected: (points) => {
           triggerHaptic('light');
-          playTapSound();
+          playCoinSound();
           setCoinsCollected((c) => c + 1);
           setScore((s) => s + points);
         },

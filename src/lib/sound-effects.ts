@@ -225,3 +225,29 @@ export function playGameOverSound(isNewRecord: boolean) {
     });
   } catch {}
 }
+
+// 8. Crisp coin pickup sound
+export function playCoinSound() {
+  if (isMuted) return;
+  try {
+    const ctx = getAudioContext();
+    if (!ctx) return;
+
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+
+    osc.type = 'sine';
+    // Fast ascending two-tone 'ding' (B5 987Hz to E6 1318Hz)
+    osc.frequency.setValueAtTime(987, ctx.currentTime);
+    osc.frequency.setValueAtTime(1318, ctx.currentTime + 0.04);
+
+    gain.gain.setValueAtTime(0.12, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.12);
+
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+
+    osc.start(ctx.currentTime);
+    osc.stop(ctx.currentTime + 0.12);
+  } catch {}
+}
