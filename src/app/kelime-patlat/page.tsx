@@ -808,13 +808,13 @@ export default function KelimePatlatPage() {
           {/* GAME BOARD: 2 COLUMNS (İNGİLİZCE & TÜRKÇE) */}
           <div className="my-auto py-1">
             {/* Column Headers with Sparks (İNGİLİZCE & TÜRKÇE) */}
-            <div className="grid grid-cols-2 gap-3 sm:gap-4 mb-2">
+            <div className="grid grid-cols-2 gap-3 sm:gap-4 mb-2.5">
               {/* İNGİLİZCE Header */}
               <div className="relative text-center">
                 <span className="absolute -left-1 -top-1 text-yellow-300 text-xs animate-spin">
                   ✦
                 </span>
-                <div className="w-full py-2 px-3 rounded-2xl bg-gradient-to-b from-[#2FD5F6] to-[#0298DE] text-white font-black text-xs sm:text-sm tracking-wider uppercase border-2 border-[#6EE7F7] border-b-4 border-b-[#0369A1] shadow-md drop-shadow-[0_2px_2px_rgba(0,0,0,0.3)]">
+                <div className="w-full py-2.5 px-4 rounded-2xl bg-gradient-to-b from-[#2FD5F6] to-[#0298DE] text-white font-black text-sm sm:text-base tracking-wider uppercase border-2 border-[#6EE7F7] border-b-4 border-b-[#0369A1] shadow-md drop-shadow-[0_2px_2px_rgba(0,0,0,0.3)]">
                   İNGİLİZCE
                 </div>
               </div>
@@ -824,16 +824,16 @@ export default function KelimePatlatPage() {
                 <span className="absolute -right-1 -top-1 text-yellow-300 text-xs animate-spin">
                   ✦
                 </span>
-                <div className="w-full py-2 px-3 rounded-2xl bg-gradient-to-b from-[#FF5B7E] to-[#E11D48] text-white font-black text-xs sm:text-sm tracking-wider uppercase border-2 border-[#FDA4AF] border-b-4 border-b-[#9F1239] shadow-md drop-shadow-[0_2px_2px_rgba(0,0,0,0.3)]">
+                <div className="w-full py-2.5 px-4 rounded-2xl bg-gradient-to-b from-[#FF5B7E] to-[#E11D48] text-white font-black text-sm sm:text-base tracking-wider uppercase border-2 border-[#FDA4AF] border-b-4 border-b-[#9F1239] shadow-md drop-shadow-[0_2px_2px_rgba(0,0,0,0.3)]">
                   TÜRKÇE
                 </div>
               </div>
             </div>
 
-            {/* 5 Rows of Cards */}
+            {/* 5 Rows of Cards - Generously Sized for Easy Touch */}
             <div className="grid grid-cols-2 gap-3 sm:gap-4">
               {/* Left Column: English Cards */}
-              <div className="space-y-2 sm:space-y-2.5">
+              <div className="space-y-2.5 sm:space-y-3">
                 {enCards.map((card) => {
                   const isSelected = selectedEn?.instanceId === card.instanceId;
                   const isMatched = card.status === 'matched';
@@ -845,23 +845,23 @@ export default function KelimePatlatPage() {
                       key={card.instanceId}
                       onClick={() => handleCardClick(card)}
                       disabled={isMatched}
-                      className={`relative w-full h-13 sm:h-15 px-3 py-2 rounded-2xl font-black text-sm sm:text-base text-center transition-all flex items-center justify-center cursor-pointer select-none ${
+                      className={`relative w-full min-h-[64px] sm:min-h-[72px] px-3.5 sm:px-4 py-3 rounded-2xl sm:rounded-3xl font-black text-base sm:text-lg text-center transition-all flex items-center justify-center cursor-pointer select-none active:translate-y-1 ${
                         isMatched || isPairHighlighted
-                          ? 'bg-gradient-to-b from-[#B4F04C] to-[#8EE035] border-2 border-[#A3E635] border-b-[5px] border-b-[#4D7C0F] text-[#14532D] shadow-xl scale-105 animate-pulse'
+                          ? 'bg-gradient-to-b from-[#B4F04C] to-[#8EE035] border-2 border-[#A3E635] border-b-[6px] border-b-[#4D7C0F] text-[#14532D] shadow-xl scale-105 animate-pulse'
                           : isWrong
-                          ? 'animate-kp-shake bg-[#FFE4E6] border-2 border-[#FB7185] border-b-[5px] border-b-[#E11D48] text-[#9F1239]'
+                          ? 'animate-kp-shake bg-[#FFE4E6] border-2 border-[#FB7185] border-b-[6px] border-b-[#E11D48] text-[#9F1239]'
                           : isSelected
-                          ? 'bg-[#E0F2FE] border-2 border-[#38BDF8] border-b-[5px] border-b-[#0284C7] text-[#0369A1] shadow-lg scale-[1.03] ring-2 ring-[#38BDF8]/60'
+                          ? 'bg-[#E0F2FE] border-2 border-[#38BDF8] border-b-[6px] border-b-[#0284C7] text-[#0369A1] shadow-lg scale-[1.03] ring-2 ring-[#38BDF8]/60'
                           : card.isGolden
-                          ? 'bg-gradient-to-b from-[#FEF08A] to-[#FDE047] border-2 border-[#FACC15] border-b-[5px] border-b-[#CA8A04] text-[#713F12] hover:brightness-105 active:translate-y-1 active:border-b-2 shadow-md'
-                          : 'bg-[#FFF9F2] hover:bg-white text-slate-800 border-2 border-[#E7D6C1] border-b-[5px] border-b-[#C9B195] shadow-md hover:scale-[1.01] active:translate-y-1 active:border-b-2'
+                          ? 'bg-gradient-to-b from-[#FEF08A] to-[#FDE047] border-2 border-[#FACC15] border-b-[6px] border-b-[#CA8A04] text-[#713F12] hover:brightness-105 active:border-b-2 shadow-md'
+                          : 'bg-[#FFF9F2] hover:bg-white text-slate-800 border-2 border-[#E7D6C1] border-b-[6px] border-b-[#C9B195] shadow-md hover:scale-[1.01] active:border-b-2'
                       }`}
                     >
-                      <span className="truncate max-w-[85%] leading-tight">{card.text}</span>
+                      <span className="truncate max-w-[85%] leading-snug">{card.text}</span>
 
                       {/* Golden Star Indicator */}
                       {(card.isGolden || isPairHighlighted) && (
-                        <span className="absolute right-2 top-1/2 -translate-y-1/2 text-amber-500 text-sm filter drop-shadow-xs">
+                        <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-amber-500 text-base sm:text-lg filter drop-shadow-xs">
                           ⭐
                         </span>
                       )}
@@ -871,7 +871,7 @@ export default function KelimePatlatPage() {
               </div>
 
               {/* Right Column: Turkish Cards */}
-              <div className="space-y-2 sm:space-y-2.5">
+              <div className="space-y-2.5 sm:space-y-3">
                 {trCards.map((card) => {
                   const isSelected = selectedTr?.instanceId === card.instanceId;
                   const isMatched = card.status === 'matched';
@@ -883,23 +883,23 @@ export default function KelimePatlatPage() {
                       key={card.instanceId}
                       onClick={() => handleCardClick(card)}
                       disabled={isMatched}
-                      className={`relative w-full h-13 sm:h-15 px-3 py-2 rounded-2xl font-black text-sm sm:text-base text-center transition-all flex items-center justify-center cursor-pointer select-none ${
+                      className={`relative w-full min-h-[64px] sm:min-h-[72px] px-3.5 sm:px-4 py-3 rounded-2xl sm:rounded-3xl font-black text-base sm:text-lg text-center transition-all flex items-center justify-center cursor-pointer select-none active:translate-y-1 ${
                         isMatched || isPairHighlighted
-                          ? 'bg-gradient-to-b from-[#B4F04C] to-[#8EE035] border-2 border-[#A3E635] border-b-[5px] border-b-[#4D7C0F] text-[#14532D] shadow-xl scale-105 animate-pulse'
+                          ? 'bg-gradient-to-b from-[#B4F04C] to-[#8EE035] border-2 border-[#A3E635] border-b-[6px] border-b-[#4D7C0F] text-[#14532D] shadow-xl scale-105 animate-pulse'
                           : isWrong
-                          ? 'animate-kp-shake bg-[#FFE4E6] border-2 border-[#FB7185] border-b-[5px] border-b-[#E11D48] text-[#9F1239]'
+                          ? 'animate-kp-shake bg-[#FFE4E6] border-2 border-[#FB7185] border-b-[6px] border-b-[#E11D48] text-[#9F1239]'
                           : isSelected
-                          ? 'bg-[#E0F2FE] border-2 border-[#38BDF8] border-b-[5px] border-b-[#0284C7] text-[#0369A1] shadow-lg scale-[1.03] ring-2 ring-[#38BDF8]/60'
+                          ? 'bg-[#E0F2FE] border-2 border-[#38BDF8] border-b-[6px] border-b-[#0284C7] text-[#0369A1] shadow-lg scale-[1.03] ring-2 ring-[#38BDF8]/60'
                           : card.isGolden
-                          ? 'bg-gradient-to-b from-[#FEF08A] to-[#FDE047] border-2 border-[#FACC15] border-b-[5px] border-b-[#CA8A04] text-[#713F12] hover:brightness-105 active:translate-y-1 active:border-b-2 shadow-md'
-                          : 'bg-[#FFF9F2] hover:bg-white text-slate-800 border-2 border-[#E7D6C1] border-b-[5px] border-b-[#C9B195] shadow-md hover:scale-[1.01] active:translate-y-1 active:border-b-2'
+                          ? 'bg-gradient-to-b from-[#FEF08A] to-[#FDE047] border-2 border-[#FACC15] border-b-[6px] border-b-[#CA8A04] text-[#713F12] hover:brightness-105 active:border-b-2 shadow-md'
+                          : 'bg-[#FFF9F2] hover:bg-white text-slate-800 border-2 border-[#E7D6C1] border-b-[6px] border-b-[#C9B195] shadow-md hover:scale-[1.01] active:border-b-2'
                       }`}
                     >
-                      <span className="truncate max-w-[85%] leading-tight">{card.text}</span>
+                      <span className="truncate max-w-[85%] leading-snug">{card.text}</span>
 
                       {/* Golden Star Indicator */}
                       {(card.isGolden || isPairHighlighted) && (
-                        <span className="absolute right-2 top-1/2 -translate-y-1/2 text-amber-500 text-sm filter drop-shadow-xs">
+                        <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-amber-500 text-base sm:text-lg filter drop-shadow-xs">
                           ⭐
                         </span>
                       )}
