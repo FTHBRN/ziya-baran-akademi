@@ -20,8 +20,8 @@ import {
   Crown,
   Play,
   CheckCircle,
-  HelpCircle,
   SlidersHorizontal,
+  Star,
 } from 'lucide-react';
 import { triggerHaptic } from '@/lib/haptics';
 import {
@@ -60,12 +60,12 @@ export default function KelimePatlatPage() {
 
   // Game state
   const [gameState, setGameState] = useState<'lobby' | 'playing' | 'gameover'>('lobby');
-  const [mode, setMode] = useState<GameMode>('60s');
+  const [mode, setMode] = useState<GameMode>('30s');
 
   // Stats
-  const [score, setScore] = useState(0);
-  const [streak, setStreak] = useState(0);
-  const [maxStreak, setMaxStreak] = useState(0);
+  const [score, setScore] = useState(100);
+  const [streak, setStreak] = useState(3);
+  const [maxStreak, setMaxStreak] = useState(3);
   const [correctMatches, setCorrectMatches] = useState(0);
   const [wrongMatches, setWrongMatches] = useState(0);
   const [feverMode, setFeverMode] = useState(false);
@@ -73,8 +73,8 @@ export default function KelimePatlatPage() {
   const [prevHighScore, setPrevHighScore] = useState(0);
 
   // Timer & Lives
-  const [timeLeft, setTimeLeft] = useState(60);
-  const [totalTime, setTotalTime] = useState(60);
+  const [timeLeft, setTimeLeft] = useState(30);
+  const [totalTime, setTotalTime] = useState(30);
   const [lives, setLives] = useState(3);
 
   // Board Cards
@@ -83,6 +83,9 @@ export default function KelimePatlatPage() {
   const [selectedEn, setSelectedEn] = useState<ActiveCard | null>(null);
   const [selectedTr, setSelectedTr] = useState<ActiveCard | null>(null);
 
+  // Energy bridge animation between matching cards
+  const [matchedPairHighlight, setMatchedPairHighlight] = useState<string | null>(null);
+
   // High scores per mode
   const [highScores, setHighScores] = useState<Record<GameMode, number>>({
     '30s': 0,
@@ -90,7 +93,7 @@ export default function KelimePatlatPage() {
     survival: 0,
   });
 
-  // Floating notification message (e.g. "+300 2x Seri!", "+150 Altın Kelime!")
+  // Floating notification message
   const [floatingBonus, setFloatingBonus] = useState<{ id: number; text: string; color: string } | null>(null);
 
   // Unused words queue during game session
@@ -102,7 +105,6 @@ export default function KelimePatlatPage() {
   useEffect(() => {
     setMuted(getSoundMuted());
 
-    // Load High Scores
     if (typeof window !== 'undefined') {
       const hs30 = parseInt(localStorage.getItem('zb_kp_hs_30s') || '0', 10);
       const hs60 = parseInt(localStorage.getItem('zb_kp_hs_60s') || '0', 10);
@@ -114,7 +116,6 @@ export default function KelimePatlatPage() {
       });
     }
 
-    // Fetch from API
     fetch('/api/kelime-patlat')
       .then((res) => res.json())
       .then((data) => {
@@ -140,7 +141,7 @@ export default function KelimePatlatPage() {
     }
 
     if (mode === 'survival') {
-      return; // Survival has no countdown
+      return;
     }
 
     timerRef.current = setInterval(() => {
@@ -159,15 +160,13 @@ export default function KelimePatlatPage() {
     };
   }, [gameState, mode]);
 
-  // Clean fever timer
   useEffect(() => {
     return () => {
       if (feverTimerRef.current) clearTimeout(feverTimerRef.current);
     };
   }, []);
 
-  // Show floating bonus alert briefly
-  const triggerFloatingBonus = (text: string, color: string = 'text-amber-500') => {
+  const triggerFloatingBonus = (text: string, color: string = 'text-amber-300') => {
     const id = Date.now();
     setFloatingBonus({ id, text, color });
     setTimeout(() => {
@@ -194,22 +193,21 @@ export default function KelimePatlatPage() {
     setIsNewRecord(false);
     setSelectedEn(null);
     setSelectedTr(null);
+    setMatchedPairHighlight(null);
 
     const oldRecord = highScores[selectedMode] || 0;
     setPrevHighScore(oldRecord);
 
-    // Shuffle word pool
     const shuffled = [...wordPool].sort(() => Math.random() - 0.5);
     const initialPairs = shuffled.slice(0, 5);
     unusedPairsRef.current = shuffled.slice(5);
 
-    // Build 5 EN cards and 5 TR cards
-    const initialEnCards: ActiveCard[] = initialPairs.map((p) => ({
+    const initialEnCards: ActiveCard[] = initialPairs.map((p, idx) => ({
       instanceId: `en-${p.id}-${Math.random()}`,
       pairId: p.id,
       text: p.en,
       lang: 'en',
-      isGolden: Math.random() < 0.15, // 15% golden chance
+      isGolden: idx === 2 || Math.random() < 0.15, // guaranteed 1 golden for fun preview
       status: 'idle',
     }));
 
@@ -225,7 +223,7 @@ export default function KelimePatlatPage() {
           status: 'idle' as const,
         };
       })
-      .sort(() => Math.random() - 0.5); // Shuffle TR column positions
+      .sort(() => Math.random() - 0.5);
 
     setEnCards(initialEnCards);
     setTrCards(initialTrCards);
@@ -249,7 +247,6 @@ export default function KelimePatlatPage() {
         }
         setHighScores((prev) => ({ ...prev, [mode]: finalScore }));
 
-        // Celebration confetti
         confetti({
           particleCount: 100,
           spread: 80,
@@ -272,13 +269,11 @@ export default function KelimePatlatPage() {
 
     if (card.lang === 'en') {
       if (selectedEn?.instanceId === card.instanceId) {
-        // Deselect
         setSelectedEn(null);
         setEnCards((prev) =>
           prev.map((c) => (c.instanceId === card.instanceId ? { ...c, status: 'idle' } : c))
         );
       } else {
-        // Select this EN card
         setSelectedEn(card);
         setEnCards((prev) =>
           prev.map((c) =>
@@ -290,21 +285,17 @@ export default function KelimePatlatPage() {
           )
         );
 
-        // Check if TR was already selected
         if (selectedTr) {
           evaluateMatch(card, selectedTr);
         }
       }
     } else {
-      // TR card clicked
       if (selectedTr?.instanceId === card.instanceId) {
-        // Deselect
         setSelectedTr(null);
         setTrCards((prev) =>
           prev.map((c) => (c.instanceId === card.instanceId ? { ...c, status: 'idle' } : c))
         );
       } else {
-        // Select this TR card
         setSelectedTr(card);
         setTrCards((prev) =>
           prev.map((c) =>
@@ -316,7 +307,6 @@ export default function KelimePatlatPage() {
           )
         );
 
-        // Check if EN was already selected
         if (selectedEn) {
           evaluateMatch(selectedEn, card);
         }
@@ -329,71 +319,70 @@ export default function KelimePatlatPage() {
     const isCorrect = enCard.pairId === trCard.pairId;
 
     if (isCorrect) {
-      // --- CORRECT MATCH ---
       setCorrectMatches((prev) => prev + 1);
       const nextStreak = streak + 1;
       setStreak(nextStreak);
       setMaxStreak((prev) => Math.max(prev, nextStreak));
 
-      // Golden Word Check
       const isGolden = enCard.isGolden || trCard.isGolden;
 
-      // Multiplier Calculation
       let multiplier = 1;
       if (nextStreak >= 10 || feverMode) {
-        multiplier = 5; // Coşku Modu
+        multiplier = 5;
       } else if (nextStreak >= 6) {
-        multiplier = 3; // 3x Seri
+        multiplier = 3;
       } else if (nextStreak >= 3) {
-        multiplier = 2; // 2x Seri
+        multiplier = 2;
       }
 
-      // Points calculation: Base 100 + Golden Bonus 150
       const basePoints = 100;
       const goldenBonus = isGolden ? 150 : 0;
       const pointsWon = (basePoints + goldenBonus) * multiplier;
 
       setScore((prev) => prev + pointsWon);
+      setMatchedPairHighlight(enCard.pairId);
 
-      // Trigger gamification audio & effects
       if (isGolden) {
         playGoldenMatchSound();
         triggerHaptic('heavy');
-        triggerFloatingBonus(`+${pointsWon} Altın Kelime! ⭐`, 'text-amber-500 font-extrabold');
+        triggerFloatingBonus(`+${pointsWon} ⭐ Altın Kelime!`, 'text-yellow-300 font-black');
         confetti({
-          particleCount: 25,
-          spread: 60,
-          colors: ['#FFD700', '#FFA500', '#FFFFFF', '#F59E0B'],
+          particleCount: 35,
+          spread: 70,
+          colors: ['#FFD700', '#FFA500', '#FFFFFF', '#65A30D', '#84CC16'],
         });
       } else {
         playMatchSound();
         triggerHaptic('medium');
         if (multiplier > 1) {
-          triggerFloatingBonus(`+${pointsWon} (${multiplier}x Seri) 🔥`, 'text-orange-500 font-black');
+          triggerFloatingBonus(`+${pointsWon} (${multiplier}x Seri) 🔥`, 'text-orange-400 font-black');
         } else {
-          triggerFloatingBonus(`+${pointsWon}`, 'text-emerald-500 font-bold');
+          triggerFloatingBonus(`+${pointsWon} Harika!`, 'text-emerald-300 font-black');
         }
-      }
-
-      // Streak milestones
-      if (nextStreak === 3) {
-        playComboSound(2);
-        triggerFloatingBonus('2x Seri Başladı! 🔥', 'text-amber-500 font-black');
-      } else if (nextStreak === 6) {
-        playComboSound(3);
-        triggerFloatingBonus('3x Seri Uçuyor! ⚡', 'text-orange-600 font-black');
-      } else if (nextStreak === 10 && !feverMode) {
-        setFeverMode(true);
-        playFeverModeSound();
-        triggerFloatingBonus('💥 COŞKU MODU! (5x PUAN) 💥', 'text-rose-500 font-black');
         confetti({
-          particleCount: 60,
-          spread: 90,
-          colors: ['#FF3366', '#FF9900', '#33CCFF', '#00FF66'],
+          particleCount: 15,
+          spread: 45,
+          colors: ['#84CC16', '#22C55E', '#38BDF8', '#FACC15'],
         });
       }
 
-      // Mark matched on screen (pop out animation)
+      if (nextStreak === 3) {
+        playComboSound(2);
+        triggerFloatingBonus('2x Seri! 🔥', 'text-amber-300 font-black');
+      } else if (nextStreak === 6) {
+        playComboSound(3);
+        triggerFloatingBonus('3x Seri Uçuyor! ⚡', 'text-orange-400 font-black');
+      } else if (nextStreak === 10 && !feverMode) {
+        setFeverMode(true);
+        playFeverModeSound();
+        triggerFloatingBonus('💥 COŞKU MODU! (5x) 💥', 'text-pink-400 font-black');
+        confetti({
+          particleCount: 70,
+          spread: 90,
+          colors: ['#FF3366', '#FF9900', '#38BDF8', '#84CC16', '#FACC15'],
+        });
+      }
+
       setEnCards((prev) =>
         prev.map((c) => (c.instanceId === enCard.instanceId ? { ...c, status: 'matched' } : c))
       );
@@ -401,23 +390,20 @@ export default function KelimePatlatPage() {
         prev.map((c) => (c.instanceId === trCard.instanceId ? { ...c, status: 'matched' } : c))
       );
 
-      // Reset selection
       setSelectedEn(null);
       setSelectedTr(null);
 
-      // Replace matched cards after 200ms
       setTimeout(() => {
+        setMatchedPairHighlight(null);
         replaceMatchedCards(enCard.pairId);
-      }, 200);
+      }, 300);
     } else {
-      // --- WRONG MATCH ---
       setWrongMatches((prev) => prev + 1);
       setStreak(0);
       setFeverMode(false);
       playErrorSound();
       triggerHaptic('error');
 
-      // Shake & red effect
       setEnCards((prev) =>
         prev.map((c) => (c.instanceId === enCard.instanceId ? { ...c, status: 'wrong' } : c))
       );
@@ -425,7 +411,6 @@ export default function KelimePatlatPage() {
         prev.map((c) => (c.instanceId === trCard.instanceId ? { ...c, status: 'wrong' } : c))
       );
 
-      // Survival lives deduction
       if (mode === 'survival') {
         setLives((prev) => {
           const newLives = prev - 1;
@@ -436,7 +421,6 @@ export default function KelimePatlatPage() {
         });
       }
 
-      // Revert cards back to idle after 250ms
       setTimeout(() => {
         setEnCards((prev) =>
           prev.map((c) => (c.instanceId === enCard.instanceId ? { ...c, status: 'idle' } : c))
@@ -450,16 +434,14 @@ export default function KelimePatlatPage() {
     }
   };
 
-  // 7. Refill cards fluidly (screen is never empty)
+  // 7. Refill cards fluidly
   const replaceMatchedCards = (matchedPairId: string) => {
-    // If unused queue is low, refill from word pool
     if (unusedPairsRef.current.length === 0) {
       unusedPairsRef.current = [...wordPool].sort(() => Math.random() - 0.5);
     }
 
-    // Pick next pair
     const nextPair = unusedPairsRef.current.shift()!;
-    const isNewGolden = Math.random() < 0.15; // 15% chance
+    const isNewGolden = Math.random() < 0.15;
 
     const newEnCard: ActiveCard = {
       instanceId: `en-${nextPair.id}-${Math.random()}`,
@@ -479,42 +461,37 @@ export default function KelimePatlatPage() {
       status: 'idle',
     };
 
-    setEnCards((prev) =>
-      prev.map((c) => (c.pairId === matchedPairId ? newEnCard : c))
-    );
-
-    setTrCards((prev) => {
-      // Find position of matched TR card
-      const updated = prev.map((c) => (c.pairId === matchedPairId ? newTrCard : c));
-      // Shuffle positions slightly or preserve
-      return updated;
-    });
+    setEnCards((prev) => prev.map((c) => (c.pairId === matchedPairId ? newEnCard : c)));
+    setTrCards((prev) => prev.map((c) => (c.pairId === matchedPairId ? newTrCard : c)));
   };
 
-  // Accuracy calculation
   const totalAttempts = correctMatches + wrongMatches;
   const accuracyPercent =
     totalAttempts > 0 ? Math.round((correctMatches / totalAttempts) * 100) : 100;
 
-  // Multiplier label
-  const currentMultiplier = feverMode ? 5 : streak >= 6 ? 3 : streak >= 3 ? 2 : 1;
-
   return (
-    <div className="relative min-h-[100dvh] bg-slate-900 text-white flex flex-col justify-between overflow-hidden select-none">
-      {/* Background Glow / Fever Atmosphere */}
-      <div
-        className={`pointer-events-none absolute inset-0 transition-opacity duration-500 ${
-          feverMode
-            ? 'opacity-100 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-amber-600/30 via-rose-900/30 to-slate-950 animate-kp-fever'
-            : 'opacity-40 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-indigo-900/40 via-slate-900/20 to-slate-950'
-        }`}
-      />
+    <div className="relative min-h-[100dvh] bg-gradient-to-b from-[#0A57CB] via-[#0E70E6] to-[#0A48A3] text-white flex flex-col justify-between overflow-hidden select-none font-sans">
+      {/* Dynamic Background Atmosphere: Soft Clouds & Floating Stars */}
+      <div className="pointer-events-none absolute inset-0 overflow-hidden">
+        {/* Soft cartoon clouds at top */}
+        <div className="absolute -top-10 -left-10 w-60 h-32 bg-white/10 rounded-full blur-xl" />
+        <div className="absolute top-4 -right-10 w-72 h-36 bg-white/15 rounded-full blur-xl" />
+        <div className="absolute top-1/4 left-5 w-4 h-4 text-amber-300/40 animate-pulse">★</div>
+        <div className="absolute top-1/3 right-8 w-6 h-6 text-yellow-200/50 animate-bounce">★</div>
+        <div className="absolute top-12 left-1/4 w-3 h-3 text-pink-300/50">✦</div>
+        <div className="absolute top-20 right-1/4 w-4 h-4 text-cyan-200/50">✦</div>
+
+        {/* Fever mode fiery glow */}
+        {feverMode && (
+          <div className="absolute inset-0 bg-radial from-amber-500/25 via-rose-600/20 to-transparent animate-kp-fever" />
+        )}
+      </div>
 
       {/* Floating bonus message banner */}
       {floatingBonus && (
-        <div className="absolute top-16 left-1/2 -translate-x-1/2 z-50 pointer-events-none animate-bounce">
-          <div className="px-4 py-1.5 rounded-full bg-slate-950/90 border border-slate-700 shadow-2xl backdrop-blur-md">
-            <span className={`text-sm sm:text-base ${floatingBonus.color}`}>
+        <div className="absolute top-28 left-1/2 -translate-x-1/2 z-50 pointer-events-none animate-bounce">
+          <div className="px-5 py-2 rounded-full bg-slate-950/90 border-2 border-yellow-400 shadow-2xl backdrop-blur-md">
+            <span className={`text-base sm:text-lg font-black tracking-wide drop-shadow-md ${floatingBonus.color}`}>
               {floatingBonus.text}
             </span>
           </div>
@@ -522,154 +499,200 @@ export default function KelimePatlatPage() {
       )}
 
       {/* ========================================================
-          1. LOBBY SCREEN (Mod Seçimi & Giriş)
+          1. LOBBY SCREEN (Renkli, Oyunsu Menü)
       ======================================================== */}
       {gameState === 'lobby' && (
-        <div className="relative z-10 flex-1 max-w-lg mx-auto w-full px-4 py-6 flex flex-col justify-between">
-          {/* Header */}
+        <div className="relative z-10 flex-1 max-w-md mx-auto w-full px-4 py-5 flex flex-col justify-between">
+          {/* Top Header Buttons */}
           <div className="flex items-center justify-between">
             <Link
               href="/"
-              className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-400 hover:text-white transition px-3 py-2 rounded-xl bg-slate-800/80 border border-slate-700/60"
+              className="px-3.5 py-2.5 rounded-2xl bg-[#1351B4] hover:bg-[#1862DC] text-white border-2 border-[#38BDF8]/60 border-b-4 border-b-[#0B377E] shadow-md font-bold text-xs flex items-center gap-1.5 active:translate-y-1 active:border-b-2 transition"
             >
-              <ArrowLeft className="w-4 h-4" />
-              <span>Akademiye Dön</span>
+              <ArrowLeft className="w-4 h-4 stroke-[3]" />
+              <span>Akademi</span>
             </Link>
 
-            <div className="flex items-center gap-2">
-              <button
-                onClick={toggleSound}
-                className="p-2.5 rounded-xl bg-slate-800/80 border border-slate-700/60 text-slate-300 hover:text-white transition cursor-pointer"
-                title={muted ? 'Sesi Aç' : 'Sesi Kapat'}
-              >
-                {muted ? <VolumeX className="w-4 h-4 text-rose-400" /> : <Volume2 className="w-4 h-4 text-emerald-400" />}
-              </button>
-            </div>
+            <button
+              onClick={toggleSound}
+              className="p-2.5 rounded-2xl bg-[#059669] hover:bg-[#10B981] text-white border-2 border-[#34D399] border-b-4 border-b-[#047857] shadow-md active:translate-y-1 active:border-b-2 transition cursor-pointer"
+            >
+              {muted ? <VolumeX className="w-5 h-5 stroke-[2.5]" /> : <Volume2 className="w-5 h-5 stroke-[2.5]" />}
+            </button>
           </div>
 
-          {/* Title & Banner */}
-          <div className="text-center my-auto py-6 space-y-3">
-            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-400 text-xs font-bold uppercase tracking-wider">
-              <Zap className="w-3.5 h-3.5 fill-amber-400" />
-              <span>Hızlı Eşleştirme Oyunu</span>
+          {/* 3D Illustrated Game Title */}
+          <div className="text-center my-auto py-4 relative">
+            {/* Rocket Illustration */}
+            <div className="absolute -top-4 right-2 sm:right-6 w-16 h-16 pointer-events-none animate-pulse">
+              <svg viewBox="0 0 64 64" fill="none" className="w-full h-full drop-shadow-lg transform rotate-12">
+                <path d="M48 6C48 6 30 16 24 32C20 42 22 46 22 46C22 46 26 48 36 44C52 38 62 20 62 20C62 20 60 10 48 6Z" fill="#F8FAFC" />
+                <path d="M48 6C56 10 62 20 62 20C62 20 54 18 42 22C38 12 48 6 48 6Z" fill="#E11D48" />
+                <circle cx="42" cy="22" r="5" fill="#38BDF8" stroke="#0284C7" strokeWidth="2" />
+                <path d="M22 46L14 54L18 42L22 46Z" fill="#F97316" />
+                <path d="M14 54L6 62L12 50L14 54Z" fill="#FACC15" />
+                <path d="M30 46L24 58L22 46L30 46Z" fill="#FB7185" />
+              </svg>
             </div>
 
-            <h1 className="text-4xl sm:text-5xl font-black tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-amber-300 via-orange-400 to-rose-400 drop-shadow-sm">
-              Kelime Patlat
-            </h1>
+            {/* Bubble 3D Title */}
+            <div className="inline-block relative">
+              <h1 className="text-5xl sm:text-6xl font-black tracking-tight leading-none text-center drop-shadow-[0_6px_0px_rgba(11,55,126,0.9)]">
+                <span className="block text-[#FFCC00] drop-shadow-[0_4px_0px_#B45309]">
+                  Kelime
+                </span>
+                <span className="block text-[#FF4D80] drop-shadow-[0_4px_0px_#9F1239] -mt-1">
+                  Patlat
+                </span>
+              </h1>
+            </div>
 
-            <p className="text-xs sm:text-sm text-slate-300 max-w-xs mx-auto leading-relaxed">
-              İngilizce ve Türkçe kelimeleri hızla eşleştir, seriyi koru, Coşku Modu'na geç ve rekor kır!
+            <p className="text-xs sm:text-sm text-cyan-100 font-extrabold mt-3 max-w-xs mx-auto drop-shadow-sm">
+              Kelimeleri hızla eşleştir, seriyi yakala, Coşku Modu'nda rekor kır! 🚀
             </p>
           </div>
 
-          {/* Game Modes */}
-          <div className="space-y-3 mb-6">
-            <p className="text-xs font-bold uppercase tracking-wider text-slate-400 px-1">
-              Oyun Modunu Seç
-            </p>
-
+          {/* Mode Selection Cards (3D Chunky Buttons) */}
+          <div className="space-y-3 mb-4">
             {/* 30 Saniye */}
             <button
               onClick={() => startGame('30s')}
-              className="w-full group p-4 rounded-2xl bg-gradient-to-r from-slate-800/90 to-slate-850 border border-slate-700/80 hover:border-amber-500/60 transition shadow-lg hover:shadow-amber-500/10 flex items-center justify-between text-left cursor-pointer active:scale-98"
+              className="w-full group p-3.5 sm:p-4 rounded-3xl bg-gradient-to-r from-[#FFFDF9] to-[#FFF6EA] text-slate-800 border-2 border-[#FED7AA] border-b-[6px] border-b-[#EA580C] shadow-lg hover:brightness-105 active:translate-y-1 active:border-b-2 transition flex items-center justify-between text-left cursor-pointer"
             >
               <div className="flex items-center gap-3.5">
-                <div className="w-12 h-12 rounded-xl bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-amber-400 group-hover:scale-110 transition-transform">
-                  <Zap className="w-6 h-6 fill-amber-400" />
+                <div className="w-12 h-12 rounded-2xl bg-gradient-to-b from-amber-400 to-orange-500 border-b-2 border-orange-700 flex items-center justify-center text-white shadow-md group-hover:scale-105 transition-transform">
+                  <Zap className="w-7 h-7 fill-white stroke-[2.5]" />
                 </div>
                 <div>
                   <div className="flex items-center gap-2">
-                    <h3 className="font-bold text-white text-base">30 Saniye</h3>
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">
-                      Yıldırım
+                    <h3 className="font-black text-slate-900 text-base sm:text-lg">30 Saniye</h3>
+                    <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-300">
+                      YILDIRIM
                     </span>
                   </div>
-                  <p className="text-xs text-slate-400 mt-0.5">Hızlı refleksler, seri eşleştirmeler.</p>
+                  <p className="text-xs font-bold text-slate-500">Süper hızlı refleks turu!</p>
                 </div>
               </div>
               <div className="text-right">
-                <div className="text-[10px] text-slate-400 font-medium">Rekor</div>
-                <div className="font-extrabold text-amber-400 text-sm">{highScores['30s']}</div>
+                <div className="text-[10px] font-black uppercase text-amber-700">Rekor</div>
+                <div className="font-black text-orange-600 text-base font-mono">{highScores['30s']}</div>
               </div>
             </button>
 
             {/* 60 Saniye */}
             <button
               onClick={() => startGame('60s')}
-              className="w-full group p-4 rounded-2xl bg-gradient-to-r from-slate-800/90 to-slate-850 border border-slate-700/80 hover:border-indigo-500/60 transition shadow-lg hover:shadow-indigo-500/10 flex items-center justify-between text-left cursor-pointer active:scale-98"
+              className="w-full group p-3.5 sm:p-4 rounded-3xl bg-gradient-to-r from-[#F0FDF4] to-[#DCFCE7] text-slate-800 border-2 border-[#BBF7D0] border-b-[6px] border-b-[#16A34A] shadow-lg hover:brightness-105 active:translate-y-1 active:border-b-2 transition flex items-center justify-between text-left cursor-pointer"
             >
               <div className="flex items-center gap-3.5">
-                <div className="w-12 h-12 rounded-xl bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center text-indigo-400 group-hover:scale-110 transition-transform">
-                  <Timer className="w-6 h-6" />
+                <div className="w-12 h-12 rounded-2xl bg-gradient-to-b from-emerald-400 to-green-600 border-b-2 border-green-800 flex items-center justify-center text-white shadow-md group-hover:scale-105 transition-transform">
+                  <Timer className="w-7 h-7 stroke-[2.5]" />
                 </div>
                 <div>
                   <div className="flex items-center gap-2">
-                    <h3 className="font-bold text-white text-base">60 Saniye</h3>
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
-                      Klasik
+                    <h3 className="font-black text-slate-900 text-base sm:text-lg">60 Saniye</h3>
+                    <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300">
+                      KLASİK
                     </span>
                   </div>
-                  <p className="text-xs text-slate-400 mt-0.5">Dengeli tempo, yüksek puan fırsatı.</p>
+                  <p className="text-xs font-bold text-slate-500">Tempolu ve dengeli yarış!</p>
                 </div>
               </div>
               <div className="text-right">
-                <div className="text-[10px] text-slate-400 font-medium">Rekor</div>
-                <div className="font-extrabold text-indigo-400 text-sm">{highScores['60s']}</div>
+                <div className="text-[10px] font-black uppercase text-emerald-700">Rekor</div>
+                <div className="font-black text-emerald-600 text-base font-mono">{highScores['60s']}</div>
               </div>
             </button>
 
             {/* Dayanabildiğin Kadar */}
             <button
               onClick={() => startGame('survival')}
-              className="w-full group p-4 rounded-2xl bg-gradient-to-r from-slate-800/90 to-slate-850 border border-slate-700/80 hover:border-rose-500/60 transition shadow-lg hover:shadow-rose-500/10 flex items-center justify-between text-left cursor-pointer active:scale-98"
+              className="w-full group p-3.5 sm:p-4 rounded-3xl bg-gradient-to-r from-[#FFF1F2] to-[#FFE4E6] text-slate-800 border-2 border-[#FECDD3] border-b-[6px] border-b-[#E11D48] shadow-lg hover:brightness-105 active:translate-y-1 active:border-b-2 transition flex items-center justify-between text-left cursor-pointer"
             >
               <div className="flex items-center gap-3.5">
-                <div className="w-12 h-12 rounded-xl bg-rose-500/20 border border-rose-500/30 flex items-center justify-center text-rose-400 group-hover:scale-110 transition-transform">
-                  <Heart className="w-6 h-6 fill-rose-500" />
+                <div className="w-12 h-12 rounded-2xl bg-gradient-to-b from-rose-400 to-pink-600 border-b-2 border-pink-800 flex items-center justify-center text-white shadow-md group-hover:scale-105 transition-transform">
+                  <Heart className="w-7 h-7 fill-white stroke-[2.5]" />
                 </div>
                 <div>
                   <div className="flex items-center gap-2">
-                    <h3 className="font-bold text-white text-base">Dayanabildiğin Kadar</h3>
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/30">
-                      Can Modu
+                    <h3 className="font-black text-slate-900 text-base sm:text-lg">Dayanabildiğin Kadar</h3>
+                    <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-rose-100 text-rose-800 border border-rose-300">
+                      3 CAN
                     </span>
                   </div>
-                  <p className="text-xs text-slate-400 mt-0.5">Süre sınırı yok! 3 yanlışta oyun biter.</p>
+                  <p className="text-xs font-bold text-slate-500">Süre yok! 3 yanlışta biter.</p>
                 </div>
               </div>
               <div className="text-right">
-                <div className="text-[10px] text-slate-400 font-medium">Rekor</div>
-                <div className="font-extrabold text-rose-400 text-sm">{highScores['survival']}</div>
+                <div className="text-[10px] font-black uppercase text-rose-700">Rekor</div>
+                <div className="font-black text-rose-600 text-base font-mono">{highScores['survival']}</div>
               </div>
             </button>
           </div>
 
-          {/* Quick Rules / Gamification tips */}
-          <div className="p-4 rounded-2xl bg-slate-800/40 border border-slate-700/40 text-xs text-slate-400 space-y-2">
-            <div className="flex items-center gap-2 text-slate-300 font-bold">
-              <Sparkles className="w-4 h-4 text-amber-400" />
-              <span>Oyun Kuralları & İpuçları</span>
+          {/* Cute Bottom Illustration (Books + Friendly Mascot Scene) */}
+          <div className="pt-2 flex items-end justify-between px-2">
+            {/* Stacked 3D Books */}
+            <div className="flex flex-col items-start scale-90 sm:scale-100 origin-bottom-left">
+              {/* English Book (Orange) */}
+              <div className="h-6 w-24 bg-gradient-to-r from-[#FF7A00] to-[#FF9E40] rounded-sm border border-[#C25E00] border-b-2 border-b-[#8F4400] text-white font-black text-[10px] flex items-center justify-center shadow-xs">
+                ENGLISH
+              </div>
+              {/* Türkçe Book (Cyan) */}
+              <div className="h-6 w-28 bg-gradient-to-r from-[#0284C7] to-[#38BDF8] rounded-sm border border-[#0369A1] border-b-2 border-b-[#075985] text-white font-black text-[10px] flex items-center justify-center shadow-xs -mt-1">
+                TÜRKÇE
+              </div>
+              {/* Kelime Book (Pink) */}
+              <div className="h-7 w-32 bg-gradient-to-r from-[#E11D48] to-[#FB7185] rounded-sm border border-[#BE123C] border-b-2 border-b-[#9F1239] text-white font-black text-[11px] flex items-center justify-center shadow-sm -mt-1">
+                KELİME
+              </div>
             </div>
-            <div className="grid grid-cols-2 gap-2 text-[11px]">
-              <div>🔥 3 Seri: <span className="text-amber-300 font-bold">2x Puan</span></div>
-              <div>⚡ 6 Seri: <span className="text-orange-400 font-bold">3x Puan</span></div>
-              <div>💥 10 Seri: <span className="text-rose-400 font-bold">Coşku Modu (5x)</span></div>
-              <div>⭐ Altın Kelime: <span className="text-yellow-400 font-bold">+150 Ekstra</span></div>
+
+            {/* School in the center distance */}
+            <div className="text-center opacity-85 scale-90 sm:scale-100">
+              <svg width="60" height="45" viewBox="0 0 60 45" fill="none">
+                <rect x="15" y="18" width="30" height="25" rx="3" fill="#F8FAFC" stroke="#94A3B8" strokeWidth="2" />
+                <polygon points="30,4 10,18 50,18" fill="#EF4444" stroke="#B91C1C" strokeWidth="2" />
+                <circle cx="30" cy="25" r="4" fill="#38BDF8" stroke="#0284C7" strokeWidth="1.5" />
+                <rect x="26" y="33" width="8" height="10" rx="1" fill="#D97706" />
+                <line x1="30" y1="4" x2="30" y2="0" stroke="#EF4444" strokeWidth="2" />
+                <polygon points="30,0 36,2 30,4" fill="#EF4444" />
+              </svg>
+            </div>
+
+            {/* Cheerful Smiling Backpack Mascot */}
+            <div className="scale-90 sm:scale-100 origin-bottom-right">
+              <svg width="55" height="60" viewBox="0 0 55 60" fill="none">
+                <rect x="8" y="10" width="38" height="46" rx="14" fill="#FBBF24" stroke="#D97706" strokeWidth="2.5" />
+                {/* Backpack pocket */}
+                <rect x="12" y="34" width="30" height="18" rx="6" fill="#8B5CF6" stroke="#6D28D9" strokeWidth="2" />
+                {/* Cute Eyes */}
+                <circle cx="21" cy="24" r="3" fill="#1E293B" />
+                <circle cx="33" cy="24" r="3" fill="#1E293B" />
+                <circle cx="22" cy="23" r="1" fill="#FFFFFF" />
+                <circle cx="34" cy="23" r="1" fill="#FFFFFF" />
+                {/* Blushing cheeks */}
+                <ellipse cx="17" cy="27" rx="2.5" ry="1.5" fill="#FDA4AF" />
+                <ellipse cx="37" cy="27" rx="2.5" ry="1.5" fill="#FDA4AF" />
+                {/* Happy Mouth */}
+                <path d="M23 28 Q27 34 31 28" stroke="#1E293B" strokeWidth="2" strokeLinecap="round" fill="#DC2626" />
+                {/* Straps */}
+                <path d="M14 10 Q14 3 20 3 L34 3 Q40 3 40 10" stroke="#7C3AED" strokeWidth="3" fill="none" />
+              </svg>
             </div>
           </div>
         </div>
       )}
 
       {/* ========================================================
-          2. IN-GAME SCREEN (Oyun Tahtası)
+          2. IN-GAME SCREEN (Canlı, Birebir Oyun Tahtası)
       ======================================================== */}
       {gameState === 'playing' && (
-        <div className="relative z-10 flex-1 flex flex-col justify-between max-w-xl mx-auto w-full px-3 sm:px-4 py-3 sm:py-4">
-          {/* Top Control Bar */}
+        <div className="relative z-10 flex-1 flex flex-col justify-between max-w-lg mx-auto w-full px-3 sm:px-4 py-2 sm:py-3">
+          {/* Top Control Bar (Referans Görseldeki Gibi Şık Hap Butonlar) */}
           <div className="space-y-2">
-            <div className="flex items-center justify-between gap-2">
-              {/* Exit button */}
+            <div className="flex items-center justify-between gap-1.5 sm:gap-2">
+              {/* Back button */}
               <button
                 onClick={() => {
                   if (confirm('Oyundan çıkmak istediğinize emin misiniz?')) {
@@ -677,267 +700,326 @@ export default function KelimePatlatPage() {
                     if (timerRef.current) clearInterval(timerRef.current);
                   }
                 }}
-                className="p-2 rounded-xl bg-slate-800/80 border border-slate-700 text-slate-400 hover:text-white transition cursor-pointer"
+                className="p-2 sm:p-2.5 rounded-2xl bg-[#1351B4] hover:bg-[#1862DC] text-white border-2 border-[#38BDF8]/70 border-b-4 border-b-[#0B377E] shadow-md active:translate-y-1 active:border-b-2 transition cursor-pointer"
                 title="Çıkış"
               >
-                <ArrowLeft className="w-4 h-4" />
+                <ArrowLeft className="w-5 h-5 stroke-[3]" />
               </button>
 
-              {/* Mode Counter: Timer OR Lives */}
-              {mode === 'survival' ? (
-                <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800/90 border border-rose-500/40 shadow-inner">
-                  {[1, 2, 3].map((heartIndex) => (
-                    <Heart
-                      key={heartIndex}
-                      className={`w-5 h-5 transition-all ${
-                        heartIndex <= lives
-                          ? 'text-rose-500 fill-rose-500 scale-100'
-                          : 'text-slate-600 scale-90 opacity-40'
-                      }`}
-                    />
-                  ))}
-                </div>
-              ) : (
-                <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-slate-800/90 border border-slate-700 shadow-inner">
-                  <Timer className={`w-4 h-4 ${timeLeft <= 5 ? 'text-rose-500 animate-spin' : 'text-indigo-400'}`} />
-                  <span
-                    className={`font-mono text-base font-black ${
-                      timeLeft <= 5 ? 'text-rose-400 animate-pulse' : 'text-white'
+              {/* Center: Lives Pill Capsule */}
+              <div className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-[#0A337A]/85 border-2 border-[#1E52A8] shadow-inner backdrop-blur-xs">
+                {[1, 2, 3].map((heartIndex) => (
+                  <Heart
+                    key={heartIndex}
+                    className={`w-5 h-5 transition-transform duration-200 ${
+                      heartIndex <= lives
+                        ? 'text-[#FF3366] fill-[#FF3366] drop-shadow-sm scale-100'
+                        : 'text-slate-600 scale-90 opacity-40'
                     }`}
-                  >
-                    {timeLeft}s
-                  </span>
-                </div>
-              )}
+                  />
+                ))}
+              </div>
 
-              {/* Score Display */}
-              <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-slate-800/90 border border-slate-700">
-                <Trophy className="w-4 h-4 text-amber-400" />
-                <span className="font-mono text-base font-black text-amber-400">
+              {/* Right: Trophy Score Pill Capsule */}
+              <div className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-[#0A337A]/85 border-2 border-[#1E52A8] shadow-inner backdrop-blur-xs">
+                <Trophy className="w-5 h-5 text-[#FFD215] fill-[#FFD215] drop-shadow-xs" />
+                <span className="font-mono text-base font-black text-[#FFD215] tracking-tight">
                   {score.toLocaleString('tr-TR')}
                 </span>
               </div>
 
-              {/* Sound Toggle */}
+              {/* Far Right: Audio Mute Button */}
               <button
                 onClick={toggleSound}
-                className="p-2 rounded-xl bg-slate-800/80 border border-slate-700 text-slate-400 hover:text-white transition cursor-pointer"
+                className="p-2 sm:p-2.5 rounded-2xl bg-[#059669] hover:bg-[#10B981] text-white border-2 border-[#34D399] border-b-4 border-b-[#047857] shadow-md active:translate-y-1 active:border-b-2 transition cursor-pointer"
+                title={muted ? 'Sesi Aç' : 'Sesi Kapat'}
               >
-                {muted ? <VolumeX className="w-4 h-4 text-rose-400" /> : <Volume2 className="w-4 h-4 text-emerald-400" />}
+                {muted ? <VolumeX className="w-5 h-5 stroke-[2.5]" /> : <Volume2 className="w-5 h-5 stroke-[2.5]" />}
               </button>
             </div>
 
-            {/* Streak & Fever Banner */}
-            <div className="flex items-center justify-between px-3 py-1.5 rounded-xl bg-slate-850/90 border border-slate-750">
+            {/* Sub Banner: Cartoon Game Logo Title */}
+            <div className="text-center py-1 relative">
+              <div className="inline-block relative">
+                <h2 className="text-3xl sm:text-4xl font-black tracking-tight leading-none text-center drop-shadow-[0_4px_0px_rgba(11,55,126,0.9)]">
+                  <span className="text-[#FFCC00] drop-shadow-[0_3px_0px_#B45309]">
+                    Kelime{' '}
+                  </span>
+                  <span className="text-[#FF4D80] drop-shadow-[0_3px_0px_#9F1239]">
+                    Patlat
+                  </span>
+                </h2>
+              </div>
+              {/* Rocket icon popping on the right */}
+              <span className="absolute -top-1 right-8 sm:right-16 text-2xl animate-pulse">
+                🚀
+              </span>
+            </div>
+
+            {/* Streak & Timer / Mode Banner */}
+            <div className="flex items-center justify-between px-3.5 py-1.5 rounded-2xl bg-[#09357E]/90 border-2 border-[#1D54AE] shadow-inner">
+              {/* Flame + Streak Segments */}
               <div className="flex items-center gap-2">
                 <Flame
-                  className={`w-4 h-4 transition-colors ${
+                  className={`w-5 h-5 transition-colors ${
                     feverMode
-                      ? 'text-rose-500 fill-rose-500 animate-bounce'
+                      ? 'text-rose-400 fill-rose-400 animate-bounce'
                       : streak >= 6
-                      ? 'text-orange-500 fill-orange-500'
+                      ? 'text-orange-400 fill-orange-400'
                       : streak >= 3
                       ? 'text-amber-400 fill-amber-400'
-                      : 'text-slate-500'
+                      : 'text-amber-400 fill-amber-400'
                   }`}
                 />
-                <span className="text-xs font-bold text-slate-300">
-                  Seri: <strong className="text-white">{streak}</strong>
+                <span className="text-xs font-black text-white">
+                  Seri: <strong className="text-amber-300 font-mono text-sm">{streak}</strong>
+                </span>
+
+                {/* 5 Segmented Golden Capsules */}
+                <div className="flex items-center gap-1 ml-1 bg-slate-900/60 p-1 rounded-full border border-slate-700/60">
+                  {[1, 2, 3, 4, 5].map((seg) => {
+                    const isFilled = (streak % 5 || (streak >= 5 ? 5 : 0)) >= seg && streak > 0;
+                    return (
+                      <div
+                        key={seg}
+                        className={`w-3.5 h-2 rounded-full transition-all duration-300 ${
+                          isFilled
+                            ? 'bg-gradient-to-r from-amber-400 to-yellow-300 shadow-sm shadow-amber-400/50 scale-105'
+                            : 'bg-slate-700/60'
+                        }`}
+                      />
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Mode Timer / Tag */}
+              <div className="flex items-center gap-1.5 px-3 py-1 rounded-xl bg-cyan-500/20 border border-cyan-400/40 text-cyan-200 text-xs font-black">
+                <Timer className="w-3.5 h-3.5 text-cyan-300" />
+                <span>
+                  {mode === 'survival'
+                    ? `${lives} Can`
+                    : `${timeLeft} Saniye`}
                 </span>
               </div>
-
-              {/* Multiplier Badge */}
-              {feverMode ? (
-                <div className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-gradient-to-r from-rose-500 to-amber-500 text-white text-[11px] font-black uppercase tracking-wider animate-pulse shadow-md shadow-rose-500/20">
-                  <Sparkles className="w-3 h-3" />
-                  <span>Coşku Modu (5x)</span>
-                </div>
-              ) : currentMultiplier > 1 ? (
-                <div className="px-2 py-0.5 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-300 text-[11px] font-black">
-                  {currentMultiplier}x Seri
-                </div>
-              ) : (
-                <span className="text-[11px] text-slate-400">1x Standart</span>
-              )}
-            </div>
-
-            {/* Countdown Progress Bar (Time modes) */}
-            {mode !== 'survival' && (
-              <div className="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
-                <div
-                  className={`h-full transition-all duration-1000 ease-linear ${
-                    timeLeft <= 5 ? 'bg-rose-500' : 'bg-gradient-to-r from-indigo-500 to-amber-400'
-                  }`}
-                  style={{ width: `${(timeLeft / totalTime) * 100}%` }}
-                />
-              </div>
-            )}
-          </div>
-
-          {/* GAME BOARD: 2 COLUMNS (5 EN & 5 TR) */}
-          <div className="my-auto py-2 grid grid-cols-2 gap-2.5 sm:gap-4 w-full">
-            {/* English Column */}
-            <div className="space-y-2 sm:space-y-2.5">
-              <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400 text-center pb-0.5">
-                İngilizce
-              </div>
-              {enCards.map((card) => {
-                const isSelected = selectedEn?.instanceId === card.instanceId;
-                const isMatched = card.status === 'matched';
-                const isWrong = card.status === 'wrong';
-
-                return (
-                  <button
-                    key={card.instanceId}
-                    onClick={() => handleCardClick(card)}
-                    disabled={isMatched}
-                    className={`relative w-full min-h-[58px] sm:min-h-[66px] px-3 py-2 rounded-2xl font-bold text-sm sm:text-base text-center transition-all flex items-center justify-center border cursor-pointer ${
-                      isMatched
-                        ? 'animate-kp-pop-out pointer-events-none opacity-0'
-                        : isWrong
-                        ? 'animate-kp-shake bg-rose-500/20 border-rose-500 text-rose-300'
-                        : isSelected
-                        ? 'bg-brand-600/30 border-brand-400 text-white ring-2 ring-brand-400/60 shadow-lg scale-[1.02]'
-                        : card.isGolden
-                        ? 'bg-gradient-to-r from-amber-500/20 to-yellow-600/20 border-amber-400/80 text-amber-200 hover:border-amber-300 shadow-md shadow-amber-500/10'
-                        : 'bg-slate-800/90 border-slate-700/80 hover:border-slate-650 hover:bg-slate-800 text-slate-100'
-                    }`}
-                  >
-                    {/* Golden Star indicator */}
-                    {card.isGolden && !isMatched && (
-                      <span className="absolute top-1.5 right-2 text-amber-400 text-xs">
-                        ⭐
-                      </span>
-                    )}
-                    <span className="truncate max-w-[90%] leading-tight">{card.text}</span>
-                  </button>
-                );
-              })}
-            </div>
-
-            {/* Turkish Column */}
-            <div className="space-y-2 sm:space-y-2.5">
-              <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400 text-center pb-0.5">
-                Türkçe
-              </div>
-              {trCards.map((card) => {
-                const isSelected = selectedTr?.instanceId === card.instanceId;
-                const isMatched = card.status === 'matched';
-                const isWrong = card.status === 'wrong';
-
-                return (
-                  <button
-                    key={card.instanceId}
-                    onClick={() => handleCardClick(card)}
-                    disabled={isMatched}
-                    className={`relative w-full min-h-[58px] sm:min-h-[66px] px-3 py-2 rounded-2xl font-bold text-sm sm:text-base text-center transition-all flex items-center justify-center border cursor-pointer ${
-                      isMatched
-                        ? 'animate-kp-pop-out pointer-events-none opacity-0'
-                        : isWrong
-                        ? 'animate-kp-shake bg-rose-500/20 border-rose-500 text-rose-300'
-                        : isSelected
-                        ? 'bg-indigo-600/30 border-indigo-400 text-white ring-2 ring-indigo-400/60 shadow-lg scale-[1.02]'
-                        : card.isGolden
-                        ? 'bg-gradient-to-r from-amber-500/20 to-yellow-600/20 border-amber-400/80 text-amber-200 hover:border-amber-300 shadow-md shadow-amber-500/10'
-                        : 'bg-slate-800/90 border-slate-700/80 hover:border-slate-650 hover:bg-slate-800 text-slate-100'
-                    }`}
-                  >
-                    {/* Golden Star indicator */}
-                    {card.isGolden && !isMatched && (
-                      <span className="absolute top-1.5 right-2 text-amber-400 text-xs">
-                        ⭐
-                      </span>
-                    )}
-                    <span className="truncate max-w-[90%] leading-tight">{card.text}</span>
-                  </button>
-                );
-              })}
             </div>
           </div>
 
-          {/* Bottom status hint */}
-          <div className="text-center text-[11px] text-slate-400 pt-1">
-            Doğru eşleşen kelimeler anında patlar ve yenileri gelir!
+          {/* GAME BOARD: 2 COLUMNS (İNGİLİZCE & TÜRKÇE) */}
+          <div className="my-auto py-1">
+            {/* Column Headers with Sparks (İNGİLİZCE & TÜRKÇE) */}
+            <div className="grid grid-cols-2 gap-3 sm:gap-4 mb-2">
+              {/* İNGİLİZCE Header */}
+              <div className="relative text-center">
+                <span className="absolute -left-1 -top-1 text-yellow-300 text-xs animate-spin">
+                  ✦
+                </span>
+                <div className="w-full py-2 px-3 rounded-2xl bg-gradient-to-b from-[#2FD5F6] to-[#0298DE] text-white font-black text-xs sm:text-sm tracking-wider uppercase border-2 border-[#6EE7F7] border-b-4 border-b-[#0369A1] shadow-md drop-shadow-[0_2px_2px_rgba(0,0,0,0.3)]">
+                  İNGİLİZCE
+                </div>
+              </div>
+
+              {/* TÜRKÇE Header */}
+              <div className="relative text-center">
+                <span className="absolute -right-1 -top-1 text-yellow-300 text-xs animate-spin">
+                  ✦
+                </span>
+                <div className="w-full py-2 px-3 rounded-2xl bg-gradient-to-b from-[#FF5B7E] to-[#E11D48] text-white font-black text-xs sm:text-sm tracking-wider uppercase border-2 border-[#FDA4AF] border-b-4 border-b-[#9F1239] shadow-md drop-shadow-[0_2px_2px_rgba(0,0,0,0.3)]">
+                  TÜRKÇE
+                </div>
+              </div>
+            </div>
+
+            {/* 5 Rows of Cards */}
+            <div className="grid grid-cols-2 gap-3 sm:gap-4">
+              {/* Left Column: English Cards */}
+              <div className="space-y-2 sm:space-y-2.5">
+                {enCards.map((card) => {
+                  const isSelected = selectedEn?.instanceId === card.instanceId;
+                  const isMatched = card.status === 'matched';
+                  const isWrong = card.status === 'wrong';
+                  const isPairHighlighted = matchedPairHighlight === card.pairId;
+
+                  return (
+                    <button
+                      key={card.instanceId}
+                      onClick={() => handleCardClick(card)}
+                      disabled={isMatched}
+                      className={`relative w-full h-13 sm:h-15 px-3 py-2 rounded-2xl font-black text-sm sm:text-base text-center transition-all flex items-center justify-center cursor-pointer select-none ${
+                        isMatched || isPairHighlighted
+                          ? 'bg-gradient-to-b from-[#B4F04C] to-[#8EE035] border-2 border-[#A3E635] border-b-[5px] border-b-[#4D7C0F] text-[#14532D] shadow-xl scale-105 animate-pulse'
+                          : isWrong
+                          ? 'animate-kp-shake bg-[#FFE4E6] border-2 border-[#FB7185] border-b-[5px] border-b-[#E11D48] text-[#9F1239]'
+                          : isSelected
+                          ? 'bg-[#E0F2FE] border-2 border-[#38BDF8] border-b-[5px] border-b-[#0284C7] text-[#0369A1] shadow-lg scale-[1.03] ring-2 ring-[#38BDF8]/60'
+                          : card.isGolden
+                          ? 'bg-gradient-to-b from-[#FEF08A] to-[#FDE047] border-2 border-[#FACC15] border-b-[5px] border-b-[#CA8A04] text-[#713F12] hover:brightness-105 active:translate-y-1 active:border-b-2 shadow-md'
+                          : 'bg-[#FFF9F2] hover:bg-white text-slate-800 border-2 border-[#E7D6C1] border-b-[5px] border-b-[#C9B195] shadow-md hover:scale-[1.01] active:translate-y-1 active:border-b-2'
+                      }`}
+                    >
+                      <span className="truncate max-w-[85%] leading-tight">{card.text}</span>
+
+                      {/* Golden Star Indicator */}
+                      {(card.isGolden || isPairHighlighted) && (
+                        <span className="absolute right-2 top-1/2 -translate-y-1/2 text-amber-500 text-sm filter drop-shadow-xs">
+                          ⭐
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Right Column: Turkish Cards */}
+              <div className="space-y-2 sm:space-y-2.5">
+                {trCards.map((card) => {
+                  const isSelected = selectedTr?.instanceId === card.instanceId;
+                  const isMatched = card.status === 'matched';
+                  const isWrong = card.status === 'wrong';
+                  const isPairHighlighted = matchedPairHighlight === card.pairId;
+
+                  return (
+                    <button
+                      key={card.instanceId}
+                      onClick={() => handleCardClick(card)}
+                      disabled={isMatched}
+                      className={`relative w-full h-13 sm:h-15 px-3 py-2 rounded-2xl font-black text-sm sm:text-base text-center transition-all flex items-center justify-center cursor-pointer select-none ${
+                        isMatched || isPairHighlighted
+                          ? 'bg-gradient-to-b from-[#B4F04C] to-[#8EE035] border-2 border-[#A3E635] border-b-[5px] border-b-[#4D7C0F] text-[#14532D] shadow-xl scale-105 animate-pulse'
+                          : isWrong
+                          ? 'animate-kp-shake bg-[#FFE4E6] border-2 border-[#FB7185] border-b-[5px] border-b-[#E11D48] text-[#9F1239]'
+                          : isSelected
+                          ? 'bg-[#E0F2FE] border-2 border-[#38BDF8] border-b-[5px] border-b-[#0284C7] text-[#0369A1] shadow-lg scale-[1.03] ring-2 ring-[#38BDF8]/60'
+                          : card.isGolden
+                          ? 'bg-gradient-to-b from-[#FEF08A] to-[#FDE047] border-2 border-[#FACC15] border-b-[5px] border-b-[#CA8A04] text-[#713F12] hover:brightness-105 active:translate-y-1 active:border-b-2 shadow-md'
+                          : 'bg-[#FFF9F2] hover:bg-white text-slate-800 border-2 border-[#E7D6C1] border-b-[5px] border-b-[#C9B195] shadow-md hover:scale-[1.01] active:translate-y-1 active:border-b-2'
+                      }`}
+                    >
+                      <span className="truncate max-w-[85%] leading-tight">{card.text}</span>
+
+                      {/* Golden Star Indicator */}
+                      {(card.isGolden || isPairHighlighted) && (
+                        <span className="absolute right-2 top-1/2 -translate-y-1/2 text-amber-500 text-sm filter drop-shadow-xs">
+                          ⭐
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+
+          {/* Cute Bottom Illustration (Books + Friendly Mascot Scene) */}
+          <div className="pt-2 flex items-end justify-between px-2">
+            {/* Stacked 3D Books */}
+            <div className="flex flex-col items-start scale-90 sm:scale-100 origin-bottom-left">
+              <div className="h-5 sm:h-6 w-22 sm:w-26 bg-gradient-to-r from-[#FF7A00] to-[#FF9E40] rounded-sm border border-[#C25E00] border-b-2 border-b-[#8F4400] text-white font-black text-[9px] sm:text-[10px] flex items-center justify-center shadow-xs">
+                ENGLISH
+              </div>
+              <div className="h-5 sm:h-6 w-26 sm:w-30 bg-gradient-to-r from-[#0284C7] to-[#38BDF8] rounded-sm border border-[#0369A1] border-b-2 border-b-[#075985] text-white font-black text-[9px] sm:text-[10px] flex items-center justify-center shadow-xs -mt-1">
+                TÜRKÇE
+              </div>
+              <div className="h-6 sm:h-7 w-30 sm:w-34 bg-gradient-to-r from-[#E11D48] to-[#FB7185] rounded-sm border border-[#BE123C] border-b-2 border-b-[#9F1239] text-white font-black text-[10px] sm:text-[11px] flex items-center justify-center shadow-sm -mt-1">
+                KELİME
+              </div>
+            </div>
+
+            {/* School in the center distance */}
+            <div className="text-center opacity-85 scale-80 sm:scale-95">
+              <svg width="55" height="40" viewBox="0 0 60 45" fill="none">
+                <rect x="15" y="18" width="30" height="25" rx="3" fill="#F8FAFC" stroke="#94A3B8" strokeWidth="2" />
+                <polygon points="30,4 10,18 50,18" fill="#EF4444" stroke="#B91C1C" strokeWidth="2" />
+                <circle cx="30" cy="25" r="4" fill="#38BDF8" stroke="#0284C7" strokeWidth="1.5" />
+                <rect x="26" y="33" width="8" height="10" rx="1" fill="#D97706" />
+                <line x1="30" y1="4" x2="30" y2="0" stroke="#EF4444" strokeWidth="2" />
+                <polygon points="30,0 36,2 30,4" fill="#EF4444" />
+              </svg>
+            </div>
+
+            {/* Cheerful Backpack Mascot */}
+            <div className="scale-90 sm:scale-100 origin-bottom-right">
+              <svg width="50" height="55" viewBox="0 0 55 60" fill="none">
+                <rect x="8" y="10" width="38" height="46" rx="14" fill="#FBBF24" stroke="#D97706" strokeWidth="2.5" />
+                <rect x="12" y="34" width="30" height="18" rx="6" fill="#8B5CF6" stroke="#6D28D9" strokeWidth="2" />
+                <circle cx="21" cy="24" r="3" fill="#1E293B" />
+                <circle cx="33" cy="24" r="3" fill="#1E293B" />
+                <circle cx="22" cy="23" r="1" fill="#FFFFFF" />
+                <circle cx="34" cy="23" r="1" fill="#FFFFFF" />
+                <ellipse cx="17" cy="27" rx="2.5" ry="1.5" fill="#FDA4AF" />
+                <ellipse cx="37" cy="27" rx="2.5" ry="1.5" fill="#FDA4AF" />
+                <path d="M23 28 Q27 34 31 28" stroke="#1E293B" strokeWidth="2" strokeLinecap="round" fill="#DC2626" />
+                <path d="M14 10 Q14 3 20 3 L34 3 Q40 3 40 10" stroke="#7C3AED" strokeWidth="3" fill="none" />
+              </svg>
+            </div>
           </div>
         </div>
       )}
 
       {/* ========================================================
-          3. GAME OVER MODAL (Sonuç & İstatistik Ekranı)
+          3. GAME OVER MODAL (Zafer & İstatistik Kartı)
       ======================================================== */}
       {gameState === 'gameover' && (
         <div className="relative z-20 flex-1 max-w-md mx-auto w-full px-4 py-6 flex flex-col justify-between animate-in zoom-in-95 duration-200">
           <div className="text-center space-y-3 pt-2">
-            {/* Crown / Record Badge */}
             {isNewRecord ? (
-              <div className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-gradient-to-r from-amber-500 to-yellow-400 text-slate-950 font-black text-xs uppercase tracking-wider shadow-lg shadow-amber-500/30 animate-pulse">
+              <div className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-gradient-to-r from-amber-400 to-yellow-300 text-slate-950 font-black text-xs uppercase tracking-wider shadow-lg shadow-amber-400/30 animate-pulse border-2 border-yellow-200">
                 <Crown className="w-4 h-4 fill-slate-950" />
                 <span>YENİ REKOR!</span>
               </div>
             ) : (
-              <div className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-slate-800 border border-slate-700 text-slate-300 text-xs font-bold">
-                <Trophy className="w-4 h-4 text-amber-400" />
+              <div className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-[#0A337A] border-2 border-[#1E52A8] text-amber-300 text-xs font-black shadow-md">
+                <Trophy className="w-4 h-4 fill-amber-300" />
                 <span>Oyun Tamamlandı</span>
               </div>
             )}
 
-            <h2 className="text-3xl font-black text-white">
-              {isNewRecord ? 'Harika Bir Performans!' : 'Tebrikler!'}
+            <h2 className="text-4xl font-black text-white drop-shadow-[0_3px_0px_rgba(0,0,0,0.4)]">
+              {isNewRecord ? 'Harika Bir Performans!' : 'Tebrikler! 🎉'}
             </h2>
-            <p className="text-xs text-slate-400">
-              {mode === '30s'
-                ? '30 Saniye Yıldırım Modu Özeti'
-                : mode === '60s'
-                ? '60 Saniye Klasik Mod Özeti'
-                : 'Dayanabildiğin Kadar Mod Özeti'}
-            </p>
 
-            {/* Big Score Box */}
-            <div className="p-5 rounded-3xl bg-gradient-to-br from-slate-800/90 to-slate-850 border border-slate-700/80 shadow-xl space-y-1 my-3">
-              <span className="text-xs uppercase font-bold tracking-wider text-slate-400">
+            {/* Chunky Score Display */}
+            <div className="p-5 rounded-3xl bg-gradient-to-b from-[#FFFDF9] to-[#FFF5E6] text-slate-800 border-2 border-[#FDBA74] border-b-6 border-b-[#EA580C] shadow-2xl space-y-1 my-3">
+              <span className="text-xs uppercase font-black tracking-wider text-orange-600">
                 Toplam Puan
               </span>
-              <div className="text-4xl sm:text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-amber-300 via-orange-400 to-amber-200 font-mono">
+              <div className="text-5xl font-black text-orange-600 font-mono tracking-tight">
                 {score.toLocaleString('tr-TR')}
               </div>
             </div>
 
-            {/* Detailed Stats Grid */}
+            {/* Stats Grid */}
             <div className="grid grid-cols-2 gap-2.5 text-left">
-              {/* Correct Matches */}
-              <div className="p-3.5 rounded-2xl bg-slate-800/60 border border-slate-700/50 space-y-1">
-                <div className="text-[11px] text-slate-400 flex items-center gap-1.5">
+              <div className="p-3.5 rounded-2xl bg-[#09357E]/90 border-2 border-[#1D54AE] shadow-inner space-y-1">
+                <div className="text-[11px] font-bold text-cyan-200 flex items-center gap-1.5">
                   <CheckCircle className="w-3.5 h-3.5 text-emerald-400" />
                   <span>Doğru Eşleşme</span>
                 </div>
-                <div className="text-lg font-black text-white">{correctMatches}</div>
+                <div className="text-xl font-black text-white">{correctMatches}</div>
               </div>
 
-              {/* Accuracy */}
-              <div className="p-3.5 rounded-2xl bg-slate-800/60 border border-slate-700/50 space-y-1">
-                <div className="text-[11px] text-slate-400 flex items-center gap-1.5">
-                  <Award className="w-3.5 h-3.5 text-indigo-400" />
-                  <span>Doğruluk Oranı</span>
+              <div className="p-3.5 rounded-2xl bg-[#09357E]/90 border-2 border-[#1D54AE] shadow-inner space-y-1">
+                <div className="text-[11px] font-bold text-cyan-200 flex items-center gap-1.5">
+                  <Award className="w-3.5 h-3.5 text-yellow-300" />
+                  <span>Doğruluk</span>
                 </div>
-                <div className="text-lg font-black text-white">%{accuracyPercent}</div>
+                <div className="text-xl font-black text-white">%{accuracyPercent}</div>
               </div>
 
-              {/* Max Streak */}
-              <div className="p-3.5 rounded-2xl bg-slate-800/60 border border-slate-700/50 space-y-1">
-                <div className="text-[11px] text-slate-400 flex items-center gap-1.5">
+              <div className="p-3.5 rounded-2xl bg-[#09357E]/90 border-2 border-[#1D54AE] shadow-inner space-y-1">
+                <div className="text-[11px] font-bold text-cyan-200 flex items-center gap-1.5">
                   <Flame className="w-3.5 h-3.5 text-orange-400" />
                   <span>En Uzun Seri</span>
                 </div>
-                <div className="text-lg font-black text-white">{maxStreak}</div>
+                <div className="text-xl font-black text-white">{maxStreak}</div>
               </div>
 
-              {/* High Score */}
-              <div className="p-3.5 rounded-2xl bg-slate-800/60 border border-slate-700/50 space-y-1">
-                <div className="text-[11px] text-slate-400 flex items-center gap-1.5">
-                  <Crown className="w-3.5 h-3.5 text-amber-400" />
-                  <span>En Yüksek Puan</span>
+              <div className="p-3.5 rounded-2xl bg-[#09357E]/90 border-2 border-[#1D54AE] shadow-inner space-y-1">
+                <div className="text-[11px] font-bold text-cyan-200 flex items-center gap-1.5">
+                  <Crown className="w-3.5 h-3.5 text-amber-300" />
+                  <span>En Yüksek Skor</span>
                 </div>
-                <div className="text-lg font-black text-amber-400 font-mono">
+                <div className="text-xl font-black text-amber-300 font-mono">
                   {highScores[mode].toLocaleString('tr-TR')}
                 </div>
               </div>
@@ -948,15 +1030,15 @@ export default function KelimePatlatPage() {
           <div className="space-y-2.5 pt-4">
             <button
               onClick={() => startGame(mode)}
-              className="w-full py-3.5 px-6 rounded-2xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-black text-base shadow-lg shadow-amber-500/25 active:scale-98 transition flex items-center justify-center gap-2 cursor-pointer"
+              className="w-full py-3.5 px-6 rounded-2xl bg-gradient-to-r from-amber-400 to-yellow-300 hover:from-amber-300 hover:to-yellow-200 text-slate-950 font-black text-base border-2 border-yellow-200 border-b-4 border-b-amber-600 shadow-xl active:translate-y-1 active:border-b-2 transition flex items-center justify-center gap-2 cursor-pointer"
             >
-              <RotateCcw className="w-5 h-5" />
+              <RotateCcw className="w-5 h-5 stroke-[3]" />
               <span>Tekrar Oyna</span>
             </button>
 
             <button
               onClick={() => setGameState('lobby')}
-              className="w-full py-3 px-6 rounded-2xl bg-slate-800 hover:bg-slate-750 text-white font-bold text-sm border border-slate-700 transition flex items-center justify-center gap-2 cursor-pointer"
+              className="w-full py-3 px-6 rounded-2xl bg-[#1351B4] hover:bg-[#1862DC] text-white font-black text-sm border-2 border-[#38BDF8]/60 border-b-4 border-b-[#0B377E] shadow-md active:translate-y-1 active:border-b-2 transition flex items-center justify-center gap-2 cursor-pointer"
             >
               <SlidersHorizontal className="w-4 h-4" />
               <span>Mod Değiştir</span>
@@ -964,9 +1046,9 @@ export default function KelimePatlatPage() {
 
             <Link
               href="/"
-              className="w-full py-2.5 px-6 text-center text-xs text-slate-400 hover:text-white transition block"
+              className="w-full py-2.5 px-6 text-center text-xs font-bold text-cyan-200 hover:text-white transition block"
             >
-              Ana Sayfaya Dön
+              Akademiye Dön
             </Link>
           </div>
         </div>
