@@ -44,6 +44,7 @@ import AdminTestManager from '@/components/admin/AdminTestManager';
 import AdminAiPracticeManager from '@/components/admin/AdminAiPracticeManager';
 import AdminSettingsManager from '@/components/admin/AdminSettingsManager';
 import AdminKelimePatlatManager from '@/components/admin/AdminKelimePatlatManager';
+import BookStudioManager from '@/components/admin/BookStudioManager';
 import AdminLoginGate from '@/components/admin/AdminLoginGate';
 import ShareModal, { ShareItem } from '@/components/admin/ShareModal';
 import AdminLibraryView from '@/components/admin/AdminLibraryView';
@@ -66,7 +67,7 @@ interface StoryPageInput {
 }
 
 export default function AdminPage() {
-  const [activeTab, setActiveTab] = useState<'library' | 'create-set' | 'story-set' | 'manage-classes' | 'all-sets' | 'stories' | 'tests' | 'ai-practice' | 'kelime-patlat' | 'settings'>('library');
+  const [activeTab, setActiveTab] = useState<'library' | 'create-set' | 'story-set' | 'manage-classes' | 'all-sets' | 'stories' | 'tests' | 'ai-practice' | 'kelime-patlat' | 'book-studio' | 'settings'>('library');
   const [shareItem, setShareItem] = useState<ShareItem | null>(null);
   const [showCreateDropdown, setShowCreateDropdown] = useState(false);
   const [isNotesExpanded, setIsNotesExpanded] = useState(false);
@@ -1855,6 +1856,22 @@ export default function AdminPage() {
             <span>💥 Kelime Patlat</span>
           </button>
 
+          {/* Book Illustration Studio Tab */}
+          <button
+            type="button"
+            onClick={() => {
+              handleCancelEdit();
+              setActiveTab('book-studio');
+            }}
+            className={`text-xs font-bold px-3.5 py-2.5 rounded-2xl border shadow-2xs flex items-center gap-1.5 transition cursor-pointer ${
+              activeTab === 'book-studio'
+                ? 'bg-orange-600 text-white border-orange-600 shadow-orange-600/20 font-black'
+                : 'text-orange-800 hover:text-orange-900 bg-orange-50 hover:bg-orange-100 border-orange-200'
+            }`}
+          >
+            <span>🎨 Kitap Görsel Stüdyosu</span>
+          </button>
+
           {/* Student Page Link */}
           <Link
             href="/"
@@ -1904,6 +1921,7 @@ export default function AdminPage() {
             {activeTab === 'tests' && 'İnteraktif Testler'}
             {activeTab === 'ai-practice' && '🤖 Niko AI Çeviri & Konuşma Atölyesi'}
             {activeTab === 'kelime-patlat' && '💥 Kelime Patlat Oyun Havuzu'}
+            {activeTab === 'book-studio' && '🎨 Ziya Baran Kitap Görsel Atölyesi (180 Sayfa)'}
             {activeTab === 'all-sets' && 'Tüm Setler'}
             {activeTab === 'settings' && 'Şifre & Güvenlik'}
           </span>
@@ -4542,6 +4560,13 @@ export default function AdminPage() {
       {/* TAB: KELİME PATLAT OYUN YÖNETİMİ                                   */}
       {/* ================================================================= */}
       {activeTab === 'kelime-patlat' && <AdminKelimePatlatManager />}
+
+      {/* ================================================================= */}
+      {/* TAB: ZİYA BARAN KİTAP GÖRSEL ATÖLYESİ (180 SAYFA)                 */}
+      {/* ================================================================= */}
+      {activeTab === 'book-studio' && (
+        <BookStudioManager onBackToLibrary={() => setActiveTab('library')} />
+      )}
 
       {/* ================================================================= */}
       {/* TAB 7: AKADEMİ ŞİFRESİ VE AYARLAR                                 */}
